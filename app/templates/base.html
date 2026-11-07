@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#0d1a10">
+  <title>{% block title %}{{ app_name }}{% endblock %}</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="/static/fonts/wix-madefor-text.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/static/fonts/wix-madefor-display.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/static/css/app.css?v=18">
+  <link rel="stylesheet" href="/static/css/motion.css?v=3">
+  <link rel="stylesheet" href="/static/css/receipt.css?v=5">
+</head>
+<body>
+{% from "_macros.html" import icon, initials with context %}
+<a class="skip" href="#main">Skip to content</a>
+{% block shell %}
+{% if user %}
+{% set path = request.url.path %}
+<div class="app">
+  <aside class="side">
+    <a class="brand brand-logo" href="/" aria-label="{{ app_name }} home">
+      <span class="logo-plate"><img src="/static/img/ultrafine-logo.png" width="302" height="80" alt="Ultrafine"></span>
+      <small>Sales Orders</small>
+    </a>
+    <nav class="nav" aria-label="Main">
+      <a href="/" {% if path == '/' %}aria-current="page"{% endif %}>{{ icon('dashboard') }}Dashboard</a>
+      <a href="/orders" {% if path.startswith('/orders') and path != '/orders/new' %}aria-current="page"{% endif %}>{{ icon('orders') }}{{ 'Approvals' if user.role == Role.ACCOUNTS else 'Orders' }}{% if nav_pending %}<span class="count" aria-label="{{ nav_pending }} waiting">{{ nav_pending }}</span>{% endif %}</a>
+      {% if user.role == Role.SALES %}<a href="/orders/new" {% if path == '/orders/new' %}aria-current="page"{% endif %}>{{ icon('plus') }}New order</a>{% endif %}
+      <a href="/reports" {% if path.startswith('/reports') %}aria-current="page"{% endif %}>{{ icon('reports') }}Reports</a>
+      {% if user.role in (Role.ADMIN, Role.ACCOUNTS) %}
+      <div class="nav-group">Master data</div>
+      <a href="/masters/plants" {% if path.startswith('/masters/plants') %}aria-current="page"{% endif %}>{{ icon('plant') }}Plants</a>
+      <a href="/masters/parties" {% if path.startswith('/masters/parties') %}aria-current="page"{% endif %}>{{ icon('customers') }}Customers</a>
+      <a href="/masters/items" {% if path.startswith('/masters/items') %}aria-current="page"{% endif %}>{{ icon('items') }}Items</a>
+      {% endif %}
+      {% if user.role == Role.ADMIN %}
+      <div class="nav-group">Administration</div>
+      <a href="/admin/users" {% if path.startswith('/admin/users') %}aria-current="page"{% endif %}>{{ icon('users') }}Users</a>
+      <a href="/admin/tally" {% if path.startswith('/admin/tally') %}aria-current="page"{% endif %}>{{ icon('sync') }}Tally queue</a>
+      <a href="/admin/mail" {% if path.startswith('/admin/mail') %}aria-current="page"{% endif %}>{{ icon('mail') }}Email log</a>
+      <a href="/admin/audit" {% if path.startswith('/admin/audit') %}aria-current="page"{% endif %}>{{ icon('audit') }}Audit log</a>
+      <a href="/admin/settings" {% if path.startswith('/admin/settings') %}aria-current="page"{% endif %}>{{ icon('settings') }}Settings</a>
+      {% endif %}
+    </nav>
+    <div class="me">
+      <div class="me-row">
+        <span class="avatar" aria-hidden="true">{{ initials(user.full_name) }}</span>
+        <a href="/account/password" title="Change your password">
+          <span class="me-name">{{ user.full_name }}</span>
+          <span class="me-role">{{ user.role.label }}</span>
+        </a>
+      </div>
+      <div class="me-links"><a href="/account/password">Password</a><a href="/account/notifications">Notification settings</a></div>
+      <form method="post" action="/logout">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button class="btn btn-small signout" type="submit">{{ icon('logout', 'i-s') }}Sign out</button>
+      </form>
+    </div>
+  </aside>
+  <div class="shell">
+    <div class="topbar">
+      <details class="menu bell" data-bell>
+        <summary class="bell-btn" aria-label="Notifications{% if nav_unread %}, {{ nav_unread }} unread{% endif %}" title="Notifications">
+          {{ icon('bell') }}<span class="bell-count" data-bell-count {% if not nav_unread %}hidden{% endif %}>{{ '99+' if nav_unread > 99 else nav_unread }}</span>
+        </summary>
+        <div class="menu-list bell-panel" role="region" aria-label="Recent notifications">
+          <div class="bell-head">
+            <b>Notifications</b>
+            <form method="post" action="/notifications/read-all"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="next" value="{{ request.url.path }}"><button class="btn btn-quiet btn-small" type="submit">Mark all read</button></form>
+          </div>
+          <ul class="bell-list" data-bell-list><li class="bell-empty">Open <a href="/notifications">your notifications</a> to see them.</li></ul>
+          <a class="bell-foot" href="/notifications">See all notifications</a>
+        </div>
+      </details>
+    </div>
+    <div class="toasts" data-toasts role="status" aria-live="polite"></div>
+    <main id="main">
+      {% if flash %}
+      <div class="notice notice-{{ flash.level }}" role="{{ 'alert' if flash.level == 'error' else 'status' }}">
+        {{ icon({'success': 'check', 'error': 'alert', 'info': 'info'}[flash.level]) }}<span>{{ flash.message }}</span>
+      </div>
+      {% endif %}
+      {% block content %}{% endblock %}
+    </main>
+    <footer class="footer"><span>{{ app_name }}</span><span>Made with ❤️ by Jarjish</span></footer>
+  </div>
+</div>
+{% else %}
+<div class="shell">
+  <main id="main">
+    {% if flash %}<div class="notice notice-{{ flash.level }}" role="status">{{ flash.message }}</div>{% endif %}
+    {% block content_anon %}{{ self.content() }}{% endblock %}
+  </main>
+  <footer class="footer"><span>{{ app_name }}</span><span>Made with ❤️ by Jarjish</span></footer>
+</div>
+{% endif %}
+{% endblock %}
+
+<dialog id="confirm-dialog" aria-labelledby="confirm-title">
+  <form method="dialog">
+    <h2 id="confirm-title">Are you sure?</h2>
+    <p data-msg></p>
+    <div class="actions">
+      <button class="btn btn-danger" type="button" data-ok>Confirm</button>
+      <button class="btn" type="button" data-close-dialog>Keep it</button>
+    </div>
+  </form>
+</dialog>
+<script src="/static/js/app.js?v=14" defer></script>
+<script src="/static/js/motion.js?v=2" defer></script>
+</body>
+</html>

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, csrf with context %}
+{% from "_list.html" import toolbar, table, pager, empty, cell with context %}
+{% block title %}Email log · {{ app_name }}{% endblock %}
+
+{% macro m_cell(c, r) %}
+  {%- if c.key == 'status' -%}<span class="badge {{ {'pending':'badge-accent','sending':'badge-accent','sent':'badge-ok','failed':'badge-warn','dead':'badge-bad'}[r.status.value] }}">{{ r.status.label }}</span>
+  {%- elif c.key == 'last_error' -%}<span class="small">{{ r.last_error or '' }}</span>
+  {%- else -%}{{ cell(c, r) }}{%- endif -%}
+{% endmacro %}
+
+{% macro m_actions(r) %}
+<div class="row-actions">{% if r.status.value in ('failed', 'dead') and r.text_body %}<form method="post" action="/admin/mail/{{ r.id }}/retry">{{ csrf() }}<button class="btn btn-small" type="submit">Retry now</button></form>{% endif %}</div>
+{% endmacro %}
+
+{% block content %}
+<div class="page-head"><div><h1>Email log</h1><p>Every email the system sends (password resets, approvals, alerts) with the time it was queued, tried and delivered.</p></div>
+  <div class="actions"><form method="post" action="/admin/mail/test">{{ csrf() }}<button class="btn btn-primary" type="submit">{{ icon('send') }}Send me a test email</button></form></div></div>
+{% if configured %}
+<div class="notice notice-success" role="status">{{ icon('check') }}<span>Email is on. Sending as <b>{{ sender }}</b> through {{ host }}. {% if waiting %}{{ waiting }} waiting to be sent.{% else %}Nothing is waiting.{% endif %} Emailed links point to <b>{{ base_url }}</b>.</span></div>
+{% else %}
+<div class="notice notice-warn" role="status">{{ icon('info') }}<span>{% if not enabled %}Email is switched off (MAIL_ENABLED=false).{% else %}Email is not set up yet. Add SMTP_HOST, SMTP_USER, SMTP_PASSWORD and MAIL_FROM to the server's .env file and restart.{% endif %} Messages wait safely in this log and are sent once it is set up.</span></div>
+{% endif %}
+{{ toolbar(st, page, 'emails', 'Search recipient, subject or error...') }}
+{% if page.rows %}
+{{ table(st, page, cellfn=m_cell, actionfn=m_actions, caption='Email log') }}
+{{ pager(st, page) }}
+{% else %}
+{{ empty(st, 'emails', 'Emails appear here as the system sends them.') }}
+{% endif %}
+{% endblock %}

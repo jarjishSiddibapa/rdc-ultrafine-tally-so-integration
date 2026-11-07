@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, csrf with context %}
+{% from "_list.html" import toolbar, table, pager, empty, cell with context %}
+{% block title %}Tally queue · {{ app_name }}{% endblock %}
+
+{% macro q_cell(c, r) %}
+  {%- if c.key == 'so_number' -%}<a class="link-strong" href="/orders/{{ r.order_id }}">{{ r.order.so_number }}</a>
+  {%- elif c.key == 'total_amount' -%}{{ r.order.total_amount|inr }}
+  {%- elif c.key == 'status' -%}<span class="badge {{ {'pending':'badge-accent','in_progress':'badge-accent','sent':'badge-ok','failed':'badge-warn','dead':'badge-bad'}[r.status.value] }}">{{ r.status.value|replace('_', ' ')|capitalize }}</span>
+  {%- elif c.key == 'last_error' -%}<span class="small">{{ r.last_error or '' }}</span>
+  {%- else -%}{{ cell(c, r) }}{%- endif -%}
+{% endmacro %}
+
+{% macro q_actions(r) %}
+<div class="row-actions">{% if r.status.value in ('failed', 'dead') %}<form method="post" action="/admin/tally/{{ r.id }}/retry">{{ csrf() }}<button class="btn btn-small" type="submit">Retry now</button></form>{% endif %}</div>
+{% endmacro %}
+
+{% block content %}
+<div class="page-head"><div><h1>Tally queue</h1><p>Approved orders are saved here first, then delivered to Tally automatically. Every attempt is timed.</p></div>
+  <div class="actions"><a class="btn" href="/reports/tally-timing">Push timing report</a></div></div>
+{% if configured %}
+<div class="notice notice-success" role="status">{{ icon('check') }}<span>Connected to {{ url_host }}. Pending orders are sent every 15 seconds.</span></div>
+{% else %}
+<div class="notice notice-warn" role="status">{{ icon('info') }}<span>The Tally API is not set up yet. Approved orders wait safely in this queue. Add TALLY_API_URL and TALLY_API_TOKEN to the server's .env file and restart to start sending.</span></div>
+{% endif %}
+{{ toolbar(st, page, 'queue entries', 'Search order, customer, reference or error...') }}
+{% if page.rows %}
+{{ table(st, page, cellfn=q_cell, actionfn=q_actions, caption='Tally queue') }}
+{{ pager(st, page) }}
+{% else %}
+{{ empty(st, 'queue entries', 'When accounts approves an order it appears here.') }}
+{% endif %}
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, csrf with context %}
+{% from "_list.html" import toolbar, table, pager, empty, cell with context %}
+{% block title %}{{ k.title }} · {{ app_name }}{% endblock %}
+
+{% macro master_cell(c, r) %}
+  {%- if c.key == 'name' -%}<span class="cell-main">{{ r.name }}</span>
+  {%- elif c.key == 'gst_rate' -%}{{ r.gst_rate.normalize() }}%
+  {%- elif c.key == 'status' -%}{% if r.deleted_at %}<span class="badge badge-bad">Removed</span>{% elif r.is_active %}<span class="badge badge-ok">Active</span>{% else %}<span class="badge">Inactive</span>{% endif %}
+  {%- else -%}{{ cell(c, r) }}{%- endif -%}
+{% endmacro %}
+
+{% macro master_actions(r) %}
+<div class="row-actions">
+  {% if r.deleted_at %}
+  <form method="post" action="/masters/{{ k.slug }}/{{ r.id }}/restore">{{ csrf() }}<button class="btn btn-small" type="submit">Restore</button></form>
+  {% else %}
+  <a class="btn btn-small" href="/masters/{{ k.slug }}/{{ r.id }}">Edit</a>
+  <form method="post" action="/masters/{{ k.slug }}/{{ r.id }}/delete">{{ csrf() }}<button class="btn btn-small btn-danger" type="submit" data-confirm="Remove {{ r.name }}?{% if k.slug == 'plants' %} It will no longer appear when creating orders ({{ used.get(r.id, 0) }} existing order{{ '' if used.get(r.id, 0) == 1 else 's' }} keep it).{% else %} Existing orders keep their data.{% endif %} You can restore it later." data-confirm-label="Remove">Remove</button></form>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% block content %}
+<div class="page-head">
+  <div><h1>{{ k.title }}</h1><p>{% if k.slug == 'plants' %}The plants or locations orders are supplied from. A plant's state decides the tax: customers in that state get CGST and SGST, all other states get IGST. Add as many as you need, even several in one state.{% else %}Names must match Tally exactly so approved orders can be posted.{% endif %}</p></div>
+  <a class="btn btn-primary" href="/masters/{{ k.slug }}/new">{{ icon('plus') }}Add {{ k.singular }}</a>
+</div>
+
+{% call toolbar(st, page, k.title|lower, 'Search by name, GSTIN, city...', own=['show_deleted']) %}
+<div class="check"><input id="sd" type="checkbox" name="show_deleted" value="1" {% if show_deleted %}checked{% endif %}><label for="sd">Include removed {{ k.title|lower }}</label></div>
+{% endcall %}
+
+{% if page.rows %}
+{{ table(st, page, cellfn=master_cell, actionfn=master_actions, caption=k.title) }}
+{{ pager(st, page) }}
+{% else %}
+{{ empty(st, k.title|lower, 'Add the ' ~ k.title|lower ~ ' that sales will pick from when creating orders.') }}
+{% endif %}
+{% endblock %}

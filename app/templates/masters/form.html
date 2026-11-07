@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf, field, state_select with context %}
+{% block title %}{{ ('Edit ' if row else 'Add ') ~ k.singular }} · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="page-head"><h1>{{ ('Edit ' if row else 'Add ') ~ k.singular }}</h1></div>
+{% if errors %}<div class="notice notice-error" role="alert">Fix the highlighted fields and save again.</div>{% endif %}
+<form method="post" action="{{ '/masters/' ~ k.slug ~ '/' ~ row.id if row else '/masters/' ~ k.slug ~ '/new' }}" class="panel stack-s" novalidate>
+  {{ csrf() }}
+  <div class="form-grid">
+    {% for f in k.fields %}
+      {% if f.type == 'state' %}
+        {{ state_select(f.name, f.label, values.get(f.name, ''), errors, required=f.required) }}
+      {% elif f.type == 'rate' %}
+        <div class="field">
+          <label for="f-{{ f.name }}">{{ f.label }} <span class="faint">(required)</span></label>
+          <select id="f-{{ f.name }}" name="{{ f.name }}" required {% if errors.get(f.name) %}aria-invalid="true" aria-describedby="e-{{ f.name }}"{% endif %}>
+            {% for r in rates %}<option value="{{ r }}" {% if values.get(f.name)|string == r %}selected{% endif %}>{{ r }}%</option>{% endfor %}
+          </select>
+          {% if errors.get(f.name) %}<span class="error" id="e-{{ f.name }}">{{ errors[f.name] }}</span>{% endif %}
+        </div>
+      {% elif f.type == 'unit' %}
+        <div class="field">
+          <label for="f-{{ f.name }}">{{ f.label }} <span class="faint">(required)</span></label>
+          <select id="f-{{ f.name }}" name="{{ f.name }}" required {% if errors.get(f.name) %}aria-invalid="true" aria-describedby="e-{{ f.name }}"{% endif %}>
+            {% for code, desc in units.items() %}<option value="{{ code }}" {% if values.get(f.name) == code %}selected{% endif %}>{{ code }} · {{ desc }}</option>{% endfor %}
+          </select>
+          {% if f.hint %}<span class="hint">{{ f.hint }}</span>{% endif %}
+          {% if errors.get(f.name) %}<span class="error" id="e-{{ f.name }}">{{ errors[f.name] }}</span>{% endif %}
+        </div>
+      {% else %}
+        {{ field(f.name, f.label, values.get(f.name, ''), errors, required=f.required, hint=f.hint or '', maxlength=f.max) }}
+      {% endif %}
+    {% endfor %}
+  </div>
+  {% if row %}
+  <div class="check"><input id="is_active" type="checkbox" name="is_active" {% if row.is_active %}checked{% endif %}><label for="is_active">Active (available when creating orders)</label></div>
+  {% endif %}
+  <div class="actions">
+    <button class="btn btn-primary" type="submit">Save</button>
+    <a class="btn btn-quiet" href="/masters/{{ k.slug }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

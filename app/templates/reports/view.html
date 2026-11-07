@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% from "_list.html" import toolbar, table, pager, empty with context %}
+{% block title %}{{ report.title }} · {{ app_name }}{% endblock %}
+{% block content %}
+<nav class="crumbs" aria-label="Breadcrumb"><a href="/reports">Reports</a><span aria-hidden="true">/</span><span>{{ report.title }}</span></nav>
+<div class="page-head">
+  <div><h1>{{ report.title }}</h1><p>{{ report.blurb }}</p></div>
+</div>
+
+<div class="presets" role="group" aria-label="Quick periods">
+  {% for label, a, b in presets %}
+  <a class="fchip-link {{ 'on' if (a == lo and b == hi) }}" href="{{ st.url(date_from=(a.isoformat() if a else None), date_to=(b.isoformat() if b else None)) }}">{{ label }}</a>
+  {% endfor %}
+</div>
+
+{% call toolbar(st, page, 'rows', 'Search this report...', own=['date_from', 'date_to'], download_label='Download report') %}
+<div class="listbar-row period">
+  <div class="field"><label for="date_from">From date <span class="faint">({{ report.period_on }})</span></label><input id="date_from" name="date_from" type="date" value="{{ lo.isoformat() if lo }}"></div>
+  <div class="field"><label for="date_to">To date</label><input id="date_to" name="date_to" type="date" value="{{ hi.isoformat() if hi }}"></div>
+  <p class="small muted period-note">{% if lo or hi %}Showing {{ report.period_on }} from {{ lo.strftime('%d %b %Y') if lo else 'the start' }} to {{ hi.strftime('%d %b %Y') if hi else 'today' }}.{% else %}Showing all time. Pick a period above or use the quick buttons.{% endif %}</p>
+</div>
+{% endcall %}
+
+{% if page.rows %}
+{{ table(st, page, caption=report.title) }}
+{{ pager(st, page) }}
+{% else %}
+{{ empty(st, 'rows', 'Nothing was recorded in this period.') }}
+{% endif %}
+{% endblock %}

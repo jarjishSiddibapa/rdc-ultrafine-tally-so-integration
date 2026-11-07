@@ -1,0 +1,222 @@
+/* Sales Order Desk — motion layer. Loaded after app.css.
+   Everything here is transform / opacity only (GPU-cheap), CSP-safe (no inline styles) and switched off
+   for people who ask for reduced motion. Browsers without a feature simply skip it. */
+
+:root {
+  --ease-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-soft: cubic-bezier(0.33, 1, 0.68, 1);
+}
+
+/* ------------------------------------------------------------------ page transitions
+   Cross-document View Transitions (Chrome / Edge): the sidebar stays put, the content cross-fades,
+   and the active-menu highlight glides from the old item to the new one. Elsewhere: normal navigation. */
+@view-transition { navigation: auto; }
+::view-transition-old(root) { animation: vt-out 180ms var(--ease-soft) both; }
+::view-transition-new(root) { animation: vt-in 320ms var(--ease-expo) both; }
+@keyframes vt-out { to { opacity: 0; transform: translateY(-6px); } }
+@keyframes vt-in { from { opacity: 0; } }
+.side { view-transition-name: side; }
+.nav a[aria-current="page"] { view-transition-name: nav-pill; }
+::view-transition-group(nav-pill) { animation-duration: 480ms; animation-timing-function: var(--ease-expo); }
+::view-transition-old(nav-pill), ::view-transition-new(nav-pill) { animation: none; mix-blend-mode: normal; height: 100%; }
+::view-transition-group(side) { animation-duration: 0s; }
+
+/* ------------------------------------------------------------------ entrance choreography */
+@keyframes rise-in { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+@keyframes pop-in { from { opacity: 0; transform: translateY(14px) scale(0.96); } to { opacity: 1; transform: none; } }
+@keyframes grow-x { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes slide-in { from { opacity: 0; transform: translateX(-22px); } to { opacity: 1; transform: none; } }
+@keyframes word-up { from { transform: translateY(112%) rotate(3deg); } to { transform: none; } }
+@keyframes drift-a { from { transform: translate3d(-8%, -6%, 0) scale(1); } to { transform: translate3d(14%, 10%, 0) scale(1.18); } }
+@keyframes drift-b { from { transform: translate3d(10%, 8%, 0) scale(1.1); } to { transform: translate3d(-12%, -10%, 0) scale(0.92); } }
+@keyframes drift-c { from { transform: translate3d(0, 12%, 0) scale(0.95); } to { transform: translate3d(-10%, -14%, 0) scale(1.15); } }
+@keyframes marquee { to { transform: translateX(-50%); } }
+@keyframes ping { 0% { box-shadow: 0 0 0 0 oklch(62% 0.2 142 / 0.55); } 100% { box-shadow: 0 0 0 14px oklch(62% 0.2 142 / 0); } }
+@keyframes float-y { from { transform: translateY(0); } to { transform: translateY(-6px); } }
+@keyframes shine { to { background-position: -20% 0; } }
+
+main > * { animation: rise-in 640ms var(--ease-expo) both; }
+main > *:nth-child(2) { animation-delay: 70ms; }
+main > *:nth-child(3) { animation-delay: 140ms; }
+main > *:nth-child(n+4) { animation-delay: 210ms; }
+
+/* Greeting / headline: words rise out of a mask. Markup comes from the split() macro, so it needs no JS. */
+.split-title .w { display: inline-block; overflow: hidden; vertical-align: top; padding: 0.06em 0.04em 0.14em; margin: -0.06em -0.04em -0.14em; }
+.split-title .w > span { display: inline-block; transform: translateY(112%); animation: word-up 1000ms var(--ease-expo) both; animation-delay: calc(140ms + var(--w, 0) * 0ms); }
+.split-title .w:nth-child(1) > span { animation-delay: 120ms; }
+.split-title .w:nth-child(2) > span { animation-delay: 190ms; }
+.split-title .w:nth-child(3) > span { animation-delay: 260ms; }
+.split-title .w:nth-child(4) > span { animation-delay: 330ms; }
+.split-title .w:nth-child(5) > span { animation-delay: 400ms; }
+.split-title .w:nth-child(6) > span { animation-delay: 470ms; }
+.split-title .w:nth-child(7) > span { animation-delay: 540ms; }
+.split-title .w:nth-child(n+8) > span { animation-delay: 610ms; }
+
+/* Dashboard */
+.grid-stats > .stat { animation: pop-in 700ms var(--ease-expo) both; }
+.grid-stats > .stat:nth-child(1) { animation-delay: 160ms; }
+.grid-stats > .stat:nth-child(2) { animation-delay: 230ms; }
+.grid-stats > .stat:nth-child(3) { animation-delay: 300ms; }
+.grid-stats > .stat:nth-child(4) { animation-delay: 370ms; }
+.grid-stats > .stat:nth-child(5) { animation-delay: 440ms; }
+.stat .chip { transition: transform 420ms var(--ease-expo); }
+@media (hover: hover) {
+  a.stat { transition: transform 420ms var(--ease-expo), border-color var(--dur-short) var(--ease-out), box-shadow 420ms var(--ease-expo); }
+  a.stat:hover { transform: translateY(-4px); box-shadow: 0 18px 36px -18px oklch(30% 0.06 145 / 0.45); }
+  a.stat:hover .chip { transform: rotate(-8deg) scale(1.12); }
+}
+.pipe svg rect { transform-box: fill-box; transform-origin: left center; animation: grow-x 1200ms var(--ease-expo) both; }
+.pipe .seg-approved { animation-delay: 350ms !important; }
+.pipe .seg-pending { animation-delay: 470ms !important; }
+.pipe .seg-rejected { animation-delay: 590ms !important; }
+.pipe .seg-draft { animation-delay: 710ms !important; }
+.todo li { animation: slide-in 600ms var(--ease-expo) both; }
+.todo li:nth-child(1) { animation-delay: 300ms; } .todo li:nth-child(2) { animation-delay: 380ms; } .todo li:nth-child(3) { animation-delay: 460ms; }
+.todo li:nth-child(4) { animation-delay: 540ms; } .todo li:nth-child(n+5) { animation-delay: 620ms; }
+
+/* Tables: rows cascade in */
+tbody tr { animation: rise-in 520ms var(--ease-expo) both; }
+tbody tr:nth-child(1) { animation-delay: 160ms; } tbody tr:nth-child(2) { animation-delay: 200ms; }
+tbody tr:nth-child(3) { animation-delay: 240ms; } tbody tr:nth-child(4) { animation-delay: 280ms; }
+tbody tr:nth-child(5) { animation-delay: 320ms; } tbody tr:nth-child(6) { animation-delay: 360ms; }
+tbody tr:nth-child(7) { animation-delay: 400ms; } tbody tr:nth-child(8) { animation-delay: 440ms; }
+tbody tr:nth-child(n+9) { animation-delay: 480ms; }
+
+/* Order progress stepper: dots pop, connectors draw, the current step pulses */
+.stepper li::before { animation: pop-in 600ms var(--ease-expo) both; }
+.stepper li:nth-child(1)::before { animation-delay: 250ms; } .stepper li:nth-child(2)::before { animation-delay: 450ms; }
+.stepper li:nth-child(3)::before { animation-delay: 650ms; } .stepper li:nth-child(4)::before { animation-delay: 850ms; }
+.stepper li::after { transform-origin: left center; animation: grow-x 700ms var(--ease-expo) both; }
+.stepper li:nth-child(1)::after { animation-delay: 380ms; } .stepper li:nth-child(2)::after { animation-delay: 580ms; } .stepper li:nth-child(3)::after { animation-delay: 780ms; }
+.stepper li.now::before { animation: pop-in 600ms var(--ease-expo) both, ping 2200ms ease-out 1.2s infinite; }
+.timeline li { animation: slide-in 560ms var(--ease-expo) both; }
+.timeline li:nth-child(1) { animation-delay: 300ms; } .timeline li:nth-child(2) { animation-delay: 400ms; }
+.timeline li:nth-child(3) { animation-delay: 500ms; } .timeline li:nth-child(n+4) { animation-delay: 600ms; }
+
+/* Scroll-driven reveals for long pages (order form, detail): panels glide in as they enter the screen. */
+@supports (animation-timeline: view()) {
+  .form-layout .stack > .panel, .split .stack > .panel {
+    animation: pop-in linear both; animation-timeline: view(); animation-range: entry 0% entry 40%;
+  }
+}
+
+/* ------------------------------------------------------------------ interaction polish */
+.btn { transition: background-color var(--dur-micro) var(--ease-out), border-color var(--dur-micro) var(--ease-out), color var(--dur-micro) var(--ease-out), transform var(--dur-micro) var(--ease-out), box-shadow 320ms var(--ease-expo), translate 260ms var(--ease-expo); }
+.btn-primary {
+  background-image: linear-gradient(105deg, transparent 38%, oklch(100% 0 0 / 0.28) 50%, transparent 62%);
+  background-size: 260% 100%; background-position: 130% 0; background-repeat: no-repeat;
+}
+@media (hover: hover) {
+  .btn-primary:hover { animation: shine 900ms var(--ease-soft) both; box-shadow: 0 10px 24px -10px oklch(45% 0.2 142 / 0.7); }
+  .btn:not(.btn-primary):hover { box-shadow: 0 6px 16px -10px oklch(30% 0.05 145 / 0.45); }
+}
+.btn:active { transform: translateY(1px) scale(0.985); }
+
+.nav a .i { transition: color var(--dur-micro) var(--ease-out), transform 360ms var(--ease-expo); }
+@media (hover: hover) { .nav a:hover .i { transform: translateX(3px) scale(1.08); } }
+.brand-mark { transition: transform 600ms var(--ease-expo); }
+.brand:hover .brand-mark { transform: rotate(-10deg) scale(1.08); }
+
+.panel { transition: box-shadow 420ms var(--ease-expo), border-color var(--dur-short) var(--ease-out); }
+input, select, textarea { transition: border-color var(--dur-micro) var(--ease-out), box-shadow 260ms var(--ease-expo), background-color var(--dur-micro) var(--ease-out); }
+input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 4px oklch(62% 0.2 142 / 0.16); }
+.choice { transition: border-color var(--dur-short) var(--ease-out), background-color var(--dur-short) var(--ease-out), transform 380ms var(--ease-expo); }
+@media (hover: hover) { .choice:hover { transform: translateY(-2px); } }
+.notice { animation: pop-in 560ms var(--ease-expo) both; }
+dialog[open] { animation: pop-in 420ms var(--ease-expo) both; }
+dialog::backdrop { animation: vt-in 300ms ease-out both; }
+
+/* Cursor-following light on cards (position is set by motion.js through CSS variables) */
+.stat, .flow li, .quick a, .choice { position: relative; isolation: isolate; }
+.stat::before, .flow li::before, .quick a::before, .choice::before {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; z-index: -1; pointer-events: none; opacity: 0;
+  background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 50%), oklch(72% 0.2 142 / 0.2), transparent 70%);
+  transition: opacity 320ms var(--ease-soft);
+}
+@media (hover: hover) { .stat:hover::before, .flow li:hover::before, .quick a:hover::before, .choice:hover::before { opacity: 1; } }
+
+/* ------------------------------------------------------------------ atmosphere + page furniture */
+/* Soft ambient light behind every signed-in page: two slow, very faint glows. */
+body:has(.app)::before {
+  content: ""; position: fixed; inset: -25%; z-index: -1; pointer-events: none; will-change: transform;
+  background:
+    radial-gradient(38rem 30rem at 82% 8%, oklch(70% 0.1 145 / 0.16), transparent 70%),
+    radial-gradient(34rem 28rem at 18% 92%, oklch(70% 0.1 150 / 0.11), transparent 70%);
+  animation: ambient 34s ease-in-out infinite alternate;
+}
+@keyframes ambient { from { transform: translate3d(-3%, -2%, 0) scale(1); } to { transform: translate3d(4%, 3%, 0) scale(1.08); } }
+
+/* Page titles: mask reveal, then an accent bar draws underneath */
+@keyframes title-in { from { clip-path: inset(0 0 100% 0); transform: translateY(0.35em); } to { clip-path: inset(-10% -5% -40% -5%); transform: none; } }
+.page-head h1, .voucher-head h1 { animation: title-in 900ms var(--ease-expo) both; }
+.page-head h1::after, .voucher-head h1::after {
+  content: ""; display: block; width: 44px; height: 4px; margin-top: var(--space-xs); border-radius: 2px;
+  background: linear-gradient(90deg, var(--color-accent), var(--color-night-accent)); transform-origin: left center;
+  animation: grow-x 900ms var(--ease-expo) 420ms both;
+}
+
+/* Tabs: the white pill glides between tabs when you change the filter (same trick as the sidebar) */
+.tabs a[aria-current="page"] { view-transition-name: tab-pill; }
+::view-transition-group(tab-pill) { animation-duration: 420ms; animation-timing-function: var(--ease-expo); }
+::view-transition-old(tab-pill), ::view-transition-new(tab-pill) { animation: none; mix-blend-mode: normal; height: 100%; }
+
+/* Table rows get an accent edge that slides in on hover */
+tbody tr td:first-child { box-shadow: inset 0 0 0 var(--color-accent); transition: background-color var(--dur-micro) var(--ease-out), box-shadow 320ms var(--ease-expo); }
+@media (hover: hover) { tbody tr:hover td:first-child { box-shadow: inset 4px 0 0 var(--color-accent); } }
+
+/* Things that are waiting for someone breathe gently */
+@keyframes dot-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.35; transform: scale(1.5); } }
+.badge-warn::before, .badge-accent::before { animation: dot-pulse 1.8s ease-in-out infinite; }
+@keyframes badge-glow { 0%, 100% { box-shadow: 0 0 0 0 oklch(62% 0.2 142 / 0.5); } 50% { box-shadow: 0 0 0 6px oklch(62% 0.2 142 / 0); } }
+.nav .count { animation: badge-glow 2.4s ease-out infinite; }
+.empty .art { animation: float-y 3.2s ease-in-out infinite alternate; }
+
+/* Live totals on the order form tick when a number changes (class toggled by motion.js) */
+@keyframes bump { 0% { transform: scale(1); } 35% { transform: scale(1.07); color: var(--color-accent); } 100% { transform: scale(1); } }
+.totals .is-bump { display: inline-block; transform-origin: right center; animation: bump 460ms var(--ease-expo); }
+
+/* Flash messages leave on their own (motion.js adds .is-leaving) */
+.notice { transition: opacity 420ms var(--ease-soft), transform 420ms var(--ease-soft); }
+.notice.is-leaving { opacity: 0; transform: translateY(-8px); }
+
+/* ------------------------------------------------------------------ sign-in screen */
+.login-hero > :not(.aurora):not(.marquee) { position: relative; z-index: 2; }
+.aurora { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; translate: calc(var(--px, 0) * 26px) calc(var(--py, 0) * 20px); transition: translate 700ms var(--ease-soft); }
+.aurora i { position: absolute; border-radius: 50%; will-change: transform; }
+.aurora .a1 { width: 62vmax; height: 62vmax; left: -22vmax; top: -26vmax; background: radial-gradient(closest-side, oklch(62% 0.2 142 / 0.7), transparent); animation: drift-a 19s ease-in-out infinite alternate; }
+.aurora .a2 { width: 52vmax; height: 52vmax; right: -24vmax; top: 16vmax; background: radial-gradient(closest-side, oklch(78% 0.17 120 / 0.38), transparent); animation: drift-b 23s ease-in-out infinite alternate; }
+.aurora .a3 { width: 46vmax; height: 46vmax; left: 6vmax; bottom: -26vmax; background: radial-gradient(closest-side, oklch(68% 0.15 150 / 0.45), transparent); animation: drift-c 27s ease-in-out infinite alternate; }
+.login-hero::after {
+  content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; opacity: 0.09; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.login-hero h1 { font-size: clamp(2.5rem, 4.6vw, 4.25rem); line-height: 1; max-width: 11ch; }
+.login-hero .lead { animation: rise-in 900ms var(--ease-expo) 700ms both; }
+.login-hero .brand { animation: slide-in 800ms var(--ease-expo) both; }
+.flow li { animation: slide-in 800ms var(--ease-expo) both; transition: transform 420ms var(--ease-expo), border-color var(--dur-short) var(--ease-out); }
+.flow li:nth-child(1) { animation-delay: 900ms; } .flow li:nth-child(2) { animation-delay: 1030ms; } .flow li:nth-child(3) { animation-delay: 1160ms; }
+@media (hover: hover) { .flow li:hover { transform: translateX(6px); border-color: var(--color-night-accent); } }
+.flow .no { transition: transform 500ms var(--ease-expo); }
+@media (hover: hover) { .flow li:hover .no { transform: rotate(-10deg) scale(1.1); } }
+.marquee { position: relative; z-index: 2; margin: 0 calc(var(--space-xl) * -1); overflow: hidden; -webkit-mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent); mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent); }
+.marquee-track { display: flex; width: max-content; animation: marquee 38s linear infinite; }
+.marquee-track span { flex: none; padding-right: 2.2rem; font: 700 clamp(1.25rem, 2vw, 1.75rem)/1 var(--font-display); letter-spacing: -0.02em; color: oklch(95% 0.02 145 / 0.16); white-space: nowrap; }
+.marquee-track span::after { content: "\2022"; margin-left: 2.2rem; color: var(--color-night-accent); opacity: 0.5; }
+.login-card { animation: rise-in 900ms var(--ease-expo) 250ms both; }
+.login-card .field { animation: rise-in 800ms var(--ease-expo) both; }
+.login-card .field:nth-of-type(1) { animation-delay: 450ms; }
+.login-card .field:nth-of-type(2) { animation-delay: 540ms; }
+.login-card .btn-primary { animation: rise-in 800ms var(--ease-expo) 650ms both; }
+.login-main { background: radial-gradient(60rem 40rem at 100% 0%, var(--color-accent-wash), transparent 60%), var(--color-paper); }
+
+/* ------------------------------------------------------------------ small screens + reduced motion */
+@media (max-width: 960px) {
+  .marquee { margin: 0 calc(var(--space-l) * -1); }
+  .login-hero h1 { font-size: 2.4rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  @view-transition { navigation: none; }
+  .aurora, .aurora i, .marquee-track { animation: none !important; translate: none; }
+  .split-title .w > span { transform: none; }
+  *, *::before, *::after { scroll-behavior: auto !important; }
+}

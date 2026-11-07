@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% from "_list.html" import toolbar, table, pager, empty, cell with context %}
+{% block title %}Audit log · {{ app_name }}{% endblock %}
+
+{% macro audit_cell(c, r) %}
+  {%- if c.key == 'record' -%}{% if r.entity_type == 'sales_order' and r.entity_id %}<a href="/orders/{{ r.entity_id }}">Order {{ r.entity_id }}</a>{% elif r.entity_type %}{{ r.entity_type|replace('_', ' ') }} {{ r.entity_id or '' }}{% endif %}
+  {%- elif c.key == 'details' -%}<span class="small mono">{% if r.details %}{% for k, v in r.details.items() %}{{ k }}: {{ v }}{% if not loop.last %}; {% endif %}{% endfor %}{% endif %}</span>
+  {%- elif c.key in ('ip_address', 'request_id') -%}<span class="mono">{{ c.raw(r) or '' }}</span>
+  {%- else -%}{{ cell(c, r) }}{%- endif -%}
+{% endmacro %}
+
+{% block content %}
+<div class="page-head"><div><h1>Audit log</h1><p>{{ page.total }} recorded event{{ 's' if page.total != 1 }}. Entries cannot be edited or deleted. Every download from here is itself recorded.</p></div></div>
+{{ toolbar(st, page, 'events', 'Search user, details or IP address...') }}
+{% if page.rows %}
+{{ table(st, page, cellfn=audit_cell, caption='Audit log') }}
+{{ pager(st, page) }}
+{% else %}
+{{ empty(st, 'events') }}
+{% endif %}
+{% endblock %}

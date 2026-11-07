@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon %}
+{% block title %}Reports · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Reports</h1><p>Ready-made reports. Pick a period, search, filter, sort, choose columns, then download as Excel or CSV. Every download is recorded in the audit log with its time.</p></div>
+</div>
+
+{% for group, items in groups %}
+<section class="report-section" aria-labelledby="g-{{ loop.index }}">
+  <h2 id="g-{{ loop.index }}">{{ group }}</h2>
+  <div class="report-grid">
+    {% for r in items %}
+    <a class="report-card" href="/reports/{{ r.slug }}">
+      <span class="chip-ic">{{ icon('reports') }}</span>
+      <strong>{{ r.title }}</strong>
+      <span class="muted small">{{ r.blurb }}</span>
+      <span class="faint small">Period applies to {{ r.period_on }}</span>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+{% endfor %}
+
+{% if exports %}
+<section class="report-section" aria-labelledby="g-data">
+  <h2 id="g-data">Data lists (download from the list page)</h2>
+  <div class="report-grid">
+    {% for title, href, blurb in exports %}
+    <a class="report-card" href="{{ href }}">
+      <span class="chip-ic">{{ icon('download') }}</span>
+      <strong>{{ title }}</strong>
+      <span class="muted small">{{ blurb }}</span>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}

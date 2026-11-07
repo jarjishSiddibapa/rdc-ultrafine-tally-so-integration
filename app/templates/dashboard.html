@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, initials, status_badge, tally_badge, empty_art, split with context %}
+{% block title %}Dashboard · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="hello">
+  <div>
+    <h1>{{ split(greeting ~ ', ' ~ user.full_name.split(' ')[0]) }}</h1>
+    <p>{{ today }}</p>
+  </div>
+  {% if user.role == Role.SALES %}<a class="btn btn-primary" href="/orders/new">{{ icon('plus') }}New sales order</a>
+  {% elif waiting %}<a class="btn btn-primary" href="/orders?status=pending_approval">{{ icon('audit') }}Review {{ waiting|length }} waiting</a>{% endif %}
+</div>
+
+{% if plants_missing %}
+<div class="notice notice-warn" role="status">{{ icon('alert') }}<span>No plants have been added, so no one can create orders yet. <a href="/masters/plants">Open plants</a>.</span></div>
+{% endif %}
+{% if user.role == Role.SALES and counts[SOStatus.REJECTED] %}
+<div class="notice notice-error" role="status">{{ icon('alert') }}<span>{{ counts[SOStatus.REJECTED] }} of your orders {{ 'was' if counts[SOStatus.REJECTED] == 1 else 'were' }} sent back. <a href="/orders?status=rejected">Review {{ 'it' if counts[SOStatus.REJECTED] == 1 else 'them' }}</a>.</span></div>
+{% endif %}
+{% if user.role == Role.ADMIN and outbox_dead %}
+<div class="notice notice-error" role="alert">{{ icon('alert') }}<span>{{ outbox_dead }} order{{ 's' if outbox_dead != 1 }} failed to reach Tally after repeated attempts. <a href="/admin/tally">Open the Tally queue</a>.</span></div>
+{% endif %}
+
+<div class="stack">
+  <section aria-labelledby="counts-h">
+    <h2 id="counts-h" class="sr-only">Order counts</h2>
+    <div class="grid-stats">
+      {% if user.role != Role.ACCOUNTS %}
+      <a class="stat" href="/orders?status=draft"><span class="chip plain">{{ icon('edit') }}</span><strong>{{ counts[SOStatus.DRAFT] }}</strong><span class="lbl">Drafts</span></a>
+      {% endif %}
+      <a class="stat" href="/orders?status=pending_approval"><span class="chip warn">{{ icon('clock') }}</span><strong>{{ counts[SOStatus.PENDING_APPROVAL] }}</strong><span class="lbl">Awaiting approval</span></a>
+      <a class="stat" href="/orders?status=approved"><span class="chip ok">{{ icon('check') }}</span><strong>{{ counts[SOStatus.APPROVED] }}</strong><span class="lbl">Approved</span></a>
+      <a class="stat" href="/orders?status=rejected"><span class="chip bad">{{ icon('undo') }}</span><strong>{{ counts[SOStatus.REJECTED] }}</strong><span class="lbl">Sent back</span></a>
+      {% if user.role == Role.ADMIN %}
+      <a class="stat" href="/admin/tally"><span class="chip">{{ icon('sync') }}</span><strong>{{ outbox_waiting }}</strong><span class="lbl">Waiting for Tally</span></a>
+      {% endif %}
+    </div>
+  </section>
+
+  {% if total %}
+  <section class="panel pipe" aria-labelledby="pipe-h">
+    <h2 id="pipe-h">Where your orders stand</h2>
+    {% set d = counts[SOStatus.DRAFT] %}{% set p = counts[SOStatus.PENDING_APPROVAL] %}{% set a = counts[SOStatus.APPROVED] %}{% set r = counts[SOStatus.REJECTED] %}
+    {% set w = 100 / total %}
+    <svg viewBox="0 0 100 14" preserveAspectRatio="none" role="img" aria-label="{{ d }} drafts, {{ p }} awaiting approval, {{ a }} approved, {{ r }} sent back">
+      <rect class="seg-approved" x="0" y="0" width="{{ a * w }}" height="14"/>
+      <rect class="seg-pending" x="{{ a * w }}" y="0" width="{{ p * w }}" height="14"/>
+      <rect class="seg-rejected" x="{{ (a + p) * w }}" y="0" width="{{ r * w }}" height="14"/>
+      <rect class="seg-draft" x="{{ (a + p + r) * w }}" y="0" width="{{ d * w }}" height="14"/>
+    </svg>
+    <div class="legend">
+      <span><i class="d-approved"></i>Approved {{ a }}</span>
+      <span><i class="d-pending"></i>Awaiting approval {{ p }}</span>
+      <span><i class="d-rejected"></i>Sent back {{ r }}</span>
+      {% if user.role != Role.ACCOUNTS %}<span><i></i>Drafts {{ d }}</span>{% endif %}
+      <span class="faint">{{ synced }} already in Tally</span>
+    </div>
+  </section>
+  {% endif %}
+
+  <div class="split split-wide">
+    <section class="panel flush" aria-labelledby="recent-h">
+      <div class="panel-head"><h2 id="recent-h">Recent activity</h2><a href="/orders">All orders</a></div>
+      {% if recent %}
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Order</th><th>Customer</th><th class="num">Total (Rs)</th><th>Status</th></tr></thead>
+          <tbody>
+          {% for o in recent %}
+            <tr>
+              <td><a class="link-strong" href="/orders/{{ o.id }}">{{ o.so_number or ('Draft #' ~ o.id) }}</a><span class="cell-sub">{{ o.so_type.short }}</span></td>
+              <td><span class="cell-main">{{ o.party_name }}</span><span class="cell-sub">PO {{ o.customer_po_number }}</span></td>
+              <td class="num">{{ o.total_amount|inr }}</td>
+              <td>{{ status_badge(o) }}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty">
+        {{ empty_art() }}
+        <h3>No orders yet</h3>
+        <p>{% if user.role == Role.SALES %}Create your first sales order from a customer PO.{% else %}Orders appear here once sales submits them.{% endif %}</p>
+        {% if user.role == Role.SALES %}<a class="btn btn-primary" href="/orders/new">{{ icon('plus') }}New sales order</a>{% endif %}
+      </div>
+      {% endif %}
+    </section>
+
+    <div class="stack">
+      {% if user.role != Role.SALES and waiting %}
+      <section class="panel" aria-labelledby="wait-h">
+        <div class="panel-head"><h2 id="wait-h">Waiting for you</h2></div>
+        <ul class="quick">
+          {% for o in waiting %}
+          <li><a href="/orders/{{ o.id }}"><span class="avatar avatar-s" aria-hidden="true">{{ initials(o.created_by.full_name) }}</span><span><b>{{ o.so_number }}</b><br><span class="small muted">{{ o.party_name }}</span></span><span class="sub">{{ o.total_amount|inr(0) }}</span></a></li>
+          {% endfor %}
+        </ul>
+      </section>
+      {% endif %}
+
+      {% if setup and not setup_done %}
+      <section class="panel" aria-labelledby="setup-h">
+        <div class="panel-head"><h2 id="setup-h">Get set up</h2></div>
+        <ul class="todo">
+          {% for s in setup %}
+          <li class="{{ 'done' if s.done }}"><span class="tick">{{ icon('check', 'i-s') }}</span><span>{{ s.label }}</span>{% if not s.done %}<a href="{{ s.href }}">Do it</a>{% endif %}</li>
+          {% endfor %}
+        </ul>
+      </section>
+      {% endif %}
+
+      {% if user.role == Role.SALES %}
+      <section class="panel" aria-labelledby="quick-h">
+        <div class="panel-head"><h2 id="quick-h">Shortcuts</h2></div>
+        <ul class="quick">
+          <li><a href="/orders/new">{{ icon('plus') }}New sales order</a></li>
+          <li><a href="/orders?status=rejected">{{ icon('undo') }}Sent back to me<span class="sub">{{ counts[SOStatus.REJECTED] }}</span></a></li>
+          <li><a href="/orders?status=draft">{{ icon('edit') }}My drafts<span class="sub">{{ counts[SOStatus.DRAFT] }}</span></a></li>
+        </ul>
+      </section>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

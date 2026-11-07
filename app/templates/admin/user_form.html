@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf, field with context %}
+{% block title %}{{ 'Edit user' if target else 'Add user' }} · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="page-head"><h1>{{ 'Edit ' ~ target.full_name if target else 'Add user' }}</h1>
+  {% if not target %}<p>A one-time password is created for the new user and shown once.</p>{% endif %}</div>
+{% if errors %}<div class="notice notice-error" role="alert">{{ errors.get('_') or 'Fix the highlighted fields and save again.' }}</div>{% endif %}
+<form method="post" action="{{ '/admin/users/' ~ target.id if target else '/admin/users/new' }}" class="panel stack-s" novalidate>
+  {{ csrf() }}
+  <div class="form-grid">
+    {% if target %}
+    <div class="field"><label for="email-ro">Email</label><input id="email-ro" type="email" value="{{ target.email }}" readonly aria-describedby="email-hint"><span class="hint" id="email-hint">The email cannot be changed.</span></div>
+    {% else %}
+    {{ field('email', 'Email', values.get('email', ''), errors, type='email', required=True, maxlength=254, autocomplete='off') }}
+    {% endif %}
+    {{ field('full_name', 'Full name', values.get('full_name', ''), errors, required=True, maxlength=120) }}
+    <div class="field">
+      <label for="f-role">Role <span class="faint">(required)</span></label>
+      <select id="f-role" name="role" required {% if errors.get('role') %}aria-invalid="true" aria-describedby="e-role"{% endif %}>
+        <option value="">Choose a role</option>
+        {% for r in roles %}<option value="{{ r.value }}" {% if values.get('role') == r.value %}selected{% endif %}>{{ r.label }}</option>{% endfor %}
+      </select>
+      {% if errors.get('role') %}<span class="error" id="e-role">{{ errors['role'] }}</span>{% endif %}
+    </div>
+  </div>
+  <fieldset class="plant-pick">
+    <legend>Regions (plants) <span class="faint">sales role only</span></legend>
+    <p class="hint">A sales person can only create orders for the plants ticked here. Nothing ticked means they cannot create orders.</p>
+    <div class="plant-grid">
+      {% for pl in all_plants %}
+      <div class="check"><input id="pl-{{ pl.id }}" type="checkbox" name="plant_ids" value="{{ pl.id }}" {% if pl.id in chosen_plants %}checked{% endif %}><label for="pl-{{ pl.id }}">{{ pl.name }}</label></div>
+      {% else %}<span class="muted">No plants yet. Add them under Master data &gt; Plants.</span>{% endfor %}
+    </div>
+  </fieldset>
+  {% if target %}
+  <div class="check"><input id="is_active" type="checkbox" name="is_active" {% if target.is_active %}checked{% endif %}><label for="is_active">Account is active</label></div>
+  {% endif %}
+  <div class="actions">
+    <button class="btn btn-primary" type="submit">{{ 'Save changes' if target else 'Create user' }}</button>
+    <a class="btn btn-quiet" href="/admin/users">Cancel</a>
+  </div>
+</form>
+{% endblock %}

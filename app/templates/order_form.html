@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, csrf, field, textarea, state_select with context %}
+{% block title %}{{ 'Edit order' if order else 'New sales order' }} · {{ app_name }}{% endblock %}
+{% block content %}
+<nav class="crumbs" aria-label="Breadcrumb"><a href="/orders">Orders</a><span aria-hidden="true">/</span><span>{{ 'Edit' if order else 'New' }}</span></nav>
+<div class="page-head">
+  <div>
+    <h1>{% if order %}Edit {{ order.so_number or ('draft #' ~ order.id) }}{% else %}New sales order{% endif %}</h1>
+    <p>Enter the details exactly as they appear on the customer PO.</p>
+  </div>
+</div>
+
+{% if order and order.status.value == 'rejected' and order.review_remarks %}
+<div class="notice notice-error" role="status">{{ icon('undo') }}<div><strong>Sent back by {{ order.reviewed_by.full_name if order.reviewed_by else 'accounts' }}:</strong> {{ order.review_remarks }}</div></div>
+{% endif %}
+{% if not plants %}
+<div class="notice notice-warn" role="alert">{{ icon('alert') }}<span>{% if any_plants %}No region is assigned to you yet, so orders cannot be saved. Ask an administrator to assign your plants under Administration &gt; Users.{% else %}No plants have been set up, so orders cannot be saved. Ask accounts or an administrator to add them under Master data &gt; Plants.{% endif %}</span></div>
+{% endif %}
+{% if errors %}
+<div class="notice notice-error" role="alert">{{ icon('alert') }}<span>{% if errors.get('_') %}{{ errors['_'] }}{% else %}Some details need attention. Fix the highlighted fields and save again.{% endif %}</span></div>
+{% endif %}
+
+<form id="order-form" method="post" action="{{ '/orders/' ~ order.id ~ '/edit' if order else '/orders/new' }}" novalidate>
+  {{ csrf() }}
+  <div class="form-layout">
+    <div class="stack">
+      <fieldset class="panel">
+        <div class="panel-head"><h2><span class="step-no">1</span>Type of sales order</h2></div>
+        <div class="choice-row" role="radiogroup" aria-label="Type of sales order">
+          {% for t in so_types %}
+          <label class="choice">
+            <input type="radio" name="so_type" value="{{ t.value }}" {% if form.so_type == t.value %}checked{% endif %} required>
+            <span><strong>{{ t.short }}</strong><span class="muted small">{{ 'For own manufactured material' if t.value == 'sales_order' else 'For trading' }}</span></span>
+          </label>
+          {% endfor %}
+        </div>
+        {% if errors.get('so_type') %}<span class="error" id="e-so_type">{{ errors['so_type'] }}</span>{% endif %}
+      </fieldset>
+
+      <section class="panel" aria-labelledby="cust-h">
+        <div class="panel-head"><h2 id="cust-h"><span class="step-no">2</span>Customer and terms</h2></div>
+        <div class="form-grid">
+          <div class="field">
+            <label for="f-plant_id">Plant / location <span class="faint">(required)</span></label>
+            <select id="f-plant_id" name="plant_id" required {% if errors.get('plant_id') %}aria-invalid="true" aria-describedby="e-plant_id"{% endif %}>
+              <option value="">{{ 'Choose the supplying plant' if plants else 'No plant assigned to you yet' }}</option>
+              {% for pl in plants %}<option value="{{ pl.id }}" data-state="{{ pl.state_code }}" {% if form.plant_id == pl.id|string %}selected{% endif %}>{{ pl.name }} ({{ pl.state_code|state_name }})</option>{% endfor %}
+            </select>
+            <span class="hint">{% if plants %}Only the plants assigned to you are listed. {% endif %}Customers in the plant's state get CGST and SGST. All other states get IGST.</span>
+            {% if errors.get('plant_id') %}<span class="error" id="e-plant_id">{{ errors['plant_id'] }}</span>{% endif %}
+          </div>
+          {{ field('order_date', 'Date', form.order_date, errors, type='date', required=True, extra='max="' ~ today ~ '"') }}
+          <div class="field">
+            <label for="f-party_id">Party A/C name (customer) <span class="faint">(required)</span></label>
+            <select id="f-party_id" name="party_id" required {% if errors.get('party_id') %}aria-invalid="true" aria-describedby="e-party_id"{% endif %}>
+              <option value="">Choose a customer</option>
+              {% for p in parties %}
+              <option value="{{ p.id }}" data-state="{{ p.state_code or '' }}" data-term="{{ p.default_payment_term or '' }}"
+                      data-address="{{ [p.address_line1, p.address_line2, p.city, p.pincode]|select|join(', ') }}"
+                      {% if form.party_id == p.id|string %}selected{% endif %}>{{ p.name }}</option>
+              {% endfor %}
+            </select>
+            {% if errors.get('party_id') %}<span class="error" id="e-party_id">{{ errors['party_id'] }}</span>{% endif %}
+            {% if not parties %}<span class="hint">No customers yet. Ask accounts or an administrator to add them.</span>{% endif %}
+          </div>
+          {{ field('customer_po_number', 'PO number (as per customer PO)', form.customer_po_number, errors, required=True, maxlength=60) }}
+          {{ field('payment_term', 'Payment term (as per PO)', form.payment_term, errors, required=True, maxlength=200) }}
+          {{ textarea('billing_address', 'Billing address', form.billing_address, errors, required=True) }}
+          {{ textarea('shipping_address', 'Shipping address', form.shipping_address, errors, required=True) }}
+          {{ state_select('billing_state_code', 'Billing state', form.billing_state_code, errors, required=True) }}
+          {{ state_select('shipping_state_code', 'Shipping state', form.shipping_state_code, errors, blank='Same as billing or not known') }}
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="items-h">
+        <div class="panel-head"><h2 id="items-h"><span class="step-no">3</span>Items</h2></div>
+        {% if errors.get('lines') %}<p class="error" role="alert">{{ errors['lines'] }}</p>{% endif %}
+        <div id="lines" class="lines">
+          {% for ln in form.lines %}
+          {% set err = errors.get('line_' ~ loop.index0) %}
+          <div class="line">
+            <div class="field">
+              <label data-for="item" for="item-{{ loop.index0 }}">Item name (as per PO)</label>
+              <select data-for="item" id="item-{{ loop.index0 }}" name="item_id" {% if err %}aria-invalid="true"{% endif %}>
+                <option value="">Choose an item</option>
+                {% for it in items %}<option value="{{ it.id }}" data-gst="{{ it.gst_rate.normalize() }}" data-unit="{{ it.unit }}" data-name="{{ it.name }}" {% if ln.item_id == it.id %}selected{% endif %}>{{ it.name }} · {{ it.unit }} · {{ it.gst_rate.normalize() }}% GST</option>{% endfor %}
+              </select>
+              {% if err %}<span class="error">{{ err }}</span>{% endif %}
+            </div>
+            <div class="field">
+              <label data-for="qty" for="qty-{{ loop.index0 }}">Quantity (<span class="uom">unit</span>)</label>
+              <input data-for="qty" id="qty-{{ loop.index0 }}" name="quantity" type="text" inputmode="decimal" value="{{ ln.quantity_raw }}" autocomplete="off" {% if err %}aria-invalid="true"{% endif %}>
+            </div>
+            <div class="field">
+              <label data-for="rate" for="rate-{{ loop.index0 }}">Rate (Rs per <span class="uom">unit</span>)</label>
+              <input data-for="rate" id="rate-{{ loop.index0 }}" name="rate" type="text" inputmode="decimal" value="{{ ln.rate_raw }}" autocomplete="off" {% if err %}aria-invalid="true"{% endif %}>
+            </div>
+            <div class="field"><span class="label">Amount (Rs)</span><div class="amount" aria-live="polite"></div></div>
+            <button class="btn btn-quiet btn-small remove" type="button" aria-label="Remove this item">{{ icon('trash', 'i-s') }}</button>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="actions mt-m">
+          <button class="btn" type="button" id="add-line">{{ icon('plus') }}Add another item</button>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="led-h">
+        <div class="panel-head"><h2 id="led-h"><span class="step-no">4</span>Ledger, narration and remarks</h2></div>
+        <div class="form-grid">
+          <div class="field">
+            <span class="label">Sales ledger</span>
+            <div class="fixed-value">{{ ledger_name }}</div>
+          </div>
+          <div class="span-all">
+            {{ textarea('remarks', 'Remarks', form.remarks, errors, rows=6, required=True, maxlength=500) }}
+          </div>
+          <div class="span-all field">
+            <span class="label">Narration <span class="faint">(created automatically)</span></span>
+            <div class="narration-preview" id="narration-preview" aria-live="polite">{% if order %}{{ order.narration }}{% else %}Choose the customer and add items to see the narration.{% endif %}</div>
+            <span class="hint">Built from the customer, items, quantities and rates above. Tally receives the narration followed by your remarks.</span>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <aside class="summary" aria-label="Order summary">
+      <section class="panel">
+        <h2>Summary</h2>
+        <p id="tax-note" class="notice notice-info mt-m" role="status"></p>
+        <div class="totals" aria-live="polite">
+          <div><span>Subtotal</span><span id="t-sub">0.00</span></div>
+          <div id="row-cgst" hidden><span>Output CGST</span><span id="t-cgst">0.00</span></div>
+          <div id="row-sgst" hidden><span>Output SGST</span><span id="t-sgst">0.00</span></div>
+          <div id="row-igst" hidden><span>Output IGST</span><span id="t-igst">0.00</span></div>
+          <div class="grand"><span>Total (Rs)</span><span id="t-total">0.00</span></div>
+        </div>
+        <p class="small muted mt-m">A live preview. The saved order uses the server's calculation.</p>
+      </section>
+      <div class="sticky-actions">
+        <button class="btn btn-primary btn-block" type="submit" name="action" value="submit">{{ icon('send') }}Submit for approval</button>
+        <button class="btn btn-block" type="submit" name="action" value="save">Save as draft</button>
+        <a class="btn btn-quiet btn-block" href="{{ '/orders/' ~ order.id if order else '/orders' }}">Cancel</a>
+      </div>
+    </aside>
+  </div>
+
+  <template id="line-template">
+    <div class="line">
+      <div class="field">
+        <label data-for="item">Item name (as per PO)</label>
+        <select data-for="item" name="item_id">
+          <option value="">Choose an item</option>
+          {% for it in items %}<option value="{{ it.id }}" data-gst="{{ it.gst_rate.normalize() }}" data-unit="{{ it.unit }}" data-name="{{ it.name }}">{{ it.name }} · {{ it.unit }} · {{ it.gst_rate.normalize() }}% GST</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field"><label data-for="qty">Quantity (<span class="uom">unit</span>)</label><input data-for="qty" name="quantity" type="text" inputmode="decimal" autocomplete="off"></div>
+      <div class="field"><label data-for="rate">Rate (Rs per <span class="uom">unit</span>)</label><input data-for="rate" name="rate" type="text" inputmode="decimal" autocomplete="off"></div>
+      <div class="field"><span class="label">Amount (Rs)</span><div class="amount" aria-live="polite"></div></div>
+      <button class="btn btn-quiet btn-small remove" type="button" aria-label="Remove this item">{{ icon('trash', 'i-s') }}</button>
+    </div>
+  </template>
+</form>
+{% endblock %}

@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, empty_art with context %}
+{% block title %}{{ title }} · {{ app_name }}{% endblock %}
+{% block content %}
+<div class="narrow panel empty">
+  {{ empty_art() }}
+  <p class="faint">Error {{ code }}</p>
+  <h1>{{ title }}</h1>
+  {% if detail %}<p class="muted">{{ detail }}</p>{% endif %}
+  <div class="actions mt-m"><a class="btn btn-primary" href="/">{{ icon('back') }}Back to dashboard</a></div>
+</div>
+{% endblock %}

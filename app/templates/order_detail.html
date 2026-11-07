@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, initials, csrf, status_badge, tally_badge with context %}
+{% block title %}{{ order.so_number or ('Draft #' ~ order.id) }} · {{ app_name }}{% endblock %}
+{% block content %}
+{% set st = order.status.value %}{% set ts = order.tally_status.value %}
+<nav class="crumbs" aria-label="Breadcrumb"><a href="/orders">Orders</a><span aria-hidden="true">/</span><span>{{ order.so_number or ('Draft #' ~ order.id) }}</span></nav>
+
+<div class="voucher-head">
+  <div>
+    <h1>{{ order.so_number or ('Draft #' ~ order.id) }}</h1>
+    <div class="meta">
+      <span>{{ order.so_type.short }}</span><span class="faint" aria-hidden="true">|</span><span>{{ order.party_name }}</span>
+      {{ status_badge(order) }}{% if order.deleted_at %}<span class="badge badge-bad">Deleted</span>{% endif %}
+    </div>
+  </div>
+  <div class="actions">
+    {% if can_edit %}
+      <a class="btn" href="/orders/{{ order.id }}/edit">{{ icon('edit') }}Edit</a>
+      <form method="post" action="/orders/{{ order.id }}/submit">{{ csrf() }}<button class="btn btn-primary" type="submit">{{ icon('send') }}Submit for approval</button></form>
+    {% endif %}
+    {% if can_withdraw %}<form method="post" action="/orders/{{ order.id }}/withdraw">{{ csrf() }}<button class="btn" type="submit">{{ icon('undo') }}Withdraw to edit</button></form>{% endif %}
+    {% if can_review %}
+      <form method="post" action="/orders/{{ order.id }}/approve">{{ csrf() }}<button class="btn btn-primary" type="submit">{{ icon('check') }}Approve</button></form>
+      <button class="btn btn-danger" type="button" data-open-dialog="reject-dialog">{{ icon('undo') }}Send back</button>
+    {% endif %}
+    {% if can_delete %}<form method="post" action="/orders/{{ order.id }}/delete">{{ csrf() }}<button class="btn btn-danger" type="submit" data-confirm="This moves the order to the deleted list. It can still be found in the audit log." data-confirm-label="Delete order">{{ icon('trash') }}Delete</button></form>{% endif %}
+  </div>
+</div>
+
+<ol class="stepper" aria-label="Order progress">
+  <li class="done"><b>Created</b><span>{{ order.created_by.full_name }}</span></li>
+  <li class="{{ 'done' if st != 'draft' else 'now' }}"><b>Submitted</b><span>{{ order.submitted_at|dt('%d %b, %I:%M %p') if order.submitted_at else 'Not yet' }}</span></li>
+  <li class="{{ 'done' if st == 'approved' else ('bad' if st == 'rejected' else ('now' if st == 'pending_approval' else '')) }}"><b>{{ 'Sent back' if st == 'rejected' else 'Approved' }}</b><span>{% if st == 'approved' or st == 'rejected' %}{{ order.reviewed_by.full_name if order.reviewed_by else '' }}{% elif st == 'pending_approval' %}Waiting for accounts{% else %}After submission{% endif %}</span></li>
+  <li class="{{ 'done' if ts == 'synced' else ('bad' if ts == 'failed' else ('now' if ts == 'queued' else '')) }}"><b>In Tally</b><span>{% if ts == 'synced' %}{{ order.tally_reference or 'Posted' }}{% elif ts == 'failed' %}Failed, admin can retry{% elif ts == 'queued' %}Queued{% else %}After approval{% endif %}</span></li>
+</ol>
+
+{% if own_pending %}<div class="notice notice-info" role="status">{{ icon('clock') }}<span>Waiting for accounts to approve. You can withdraw it to make changes.</span></div>{% endif %}
+{% if st == 'pending_approval' and not can_review and user.role != Role.SALES %}
+  <div class="notice notice-info" role="status">{{ icon('info') }}<span>You created this order, so someone else must approve it.</span></div>
+{% endif %}
+{% if st == 'rejected' and order.review_remarks %}
+  <div class="notice notice-error" role="status">{{ icon('undo') }}<div><strong>Sent back by {{ order.reviewed_by.full_name if order.reviewed_by else 'accounts' }}:</strong> {{ order.review_remarks }}</div></div>
+{% endif %}
+{% if st == 'approved' and ts == 'failed' %}
+  <div class="notice notice-error" role="alert">{{ icon('alert') }}<span>Sending to Tally failed. An administrator can retry it from the Tally queue.</span></div>
+{% endif %}
+
+<div class="split split-wide">
+  <div class="stack">
+    <section class="panel" aria-labelledby="sum-h">
+      <h2 id="sum-h">Order details</h2>
+      <dl class="kv mt-m">
+        <div><dt>Date</dt><dd>{{ order.order_date|date }}</dd></div>
+        <div><dt>Customer (Party A/C)</dt><dd>{{ order.party_name }}{% if order.party_gstin %}<br><span class="faint small">GSTIN {{ order.party_gstin }}</span>{% endif %}</dd></div>
+        <div><dt>Customer PO number</dt><dd>{{ order.customer_po_number }}</dd></div>
+        <div><dt>Payment term</dt><dd>{{ order.payment_term }}</dd></div>
+        <div><dt>Billing address</dt><dd>{{ order.billing_address }}<br><span class="faint small">{{ order.billing_state_code|state_name }}</span></dd></div>
+        <div><dt>Shipping address</dt><dd>{{ order.shipping_address }}{% if order.shipping_state_code %}<br><span class="faint small">{{ order.shipping_state_code|state_name }}</span>{% endif %}</dd></div>
+        {% if order.plant_name %}<div><dt>Plant / location</dt><dd>{{ order.plant_name }}{% if order.plant_state_code %}<br><span class="faint small">{{ order.plant_state_code|state_name }}</span>{% endif %}</dd></div>{% endif %}
+        <div><dt>Sales ledger</dt><dd>{{ order.sales_ledger_name }}</dd></div>
+        <div><dt>Tax applied</dt><dd>{{ order.tax_mode.label }}</dd></div>
+      </dl>
+      <div class="narration"><div class="label">Narration (auto-generated)</div><p>{{ order.narration }}</p><div class="label mt-m">Remarks</div><p>{{ order.remarks }}</p></div>
+    </section>
+
+    <section class="panel flush" aria-labelledby="items-h">
+      <div class="panel-head"><h2 id="items-h">Items</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Item</th><th>HSN</th><th class="num">Quantity</th><th class="num">Rate (Rs)</th><th class="num">GST</th><th class="num">Amount (Rs)</th></tr></thead>
+          <tbody>
+          {% for i in order.items %}
+            <tr><td class="faint">{{ i.line_no }}</td><td><span class="cell-main">{{ i.item_name }}</span></td><td>{{ i.hsn_code or '' }}</td>
+                <td class="num">{{ i.quantity|qty }} {{ i.unit }}</td><td class="num">{{ i.rate|inr }} <span class="faint small">/ {{ i.unit }}</span></td>
+                <td class="num">{{ i.gst_rate.normalize() }}%</td><td class="num"><b>{{ i.amount|inr }}</b></td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="panel-foot">
+        <div class="totals">
+          <div><span>Subtotal</span><span>{{ order.subtotal|inr }}</span></div>
+          {% if order.tax_mode.value == 'cgst_sgst' %}
+          <div><span>Output CGST</span><span>{{ order.cgst_amount|inr }}</span></div>
+          <div><span>Output SGST</span><span>{{ order.sgst_amount|inr }}</span></div>
+          {% else %}
+          <div><span>Output IGST</span><span>{{ order.igst_amount|inr }}</span></div>
+          {% endif %}
+          <div class="grand"><span>Total (Rs)</span><span>{{ order.total_amount|inr }}</span></div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="stack">
+    <section class="panel" aria-labelledby="who-h">
+      <h2 id="who-h">People and Tally</h2>
+      <dl class="kv mt-m">
+        <div><dt>Created by</dt><dd><span class="who"><span class="avatar avatar-s" aria-hidden="true">{{ initials(order.created_by.full_name) }}</span>{{ order.created_by.full_name }}</span><span class="faint small">{{ order.created_at|dt }}</span></dd></div>
+        {% if order.reviewed_by %}<div><dt>Reviewed by</dt><dd><span class="who"><span class="avatar avatar-s" aria-hidden="true">{{ initials(order.reviewed_by.full_name) }}</span>{{ order.reviewed_by.full_name }}</span><span class="faint small">{{ order.reviewed_at|dt }}</span></dd></div>{% endif %}
+        <div><dt>Tally</dt><dd>{{ tally_badge(order) }}</dd></div>
+        {% if outbox and user.role == Role.ADMIN %}
+        <div><dt>Queue attempts</dt><dd>{{ outbox.attempts }}{% if outbox.last_error %}<br><span class="small">{{ outbox.last_error }}</span>{% endif %}</dd></div>
+        {% endif %}
+      </dl>
+    </section>
+
+    {% set full = '%d %b %Y, %I:%M:%S %p' %}
+    <section class="panel" aria-labelledby="stamp-h">
+      <h2 id="stamp-h">Timestamps</h2>
+      <dl class="stamps">
+        <div><dt>Created</dt><dd>{{ order.created_at|dt(full) }}<br><span class="faint small">by {{ order.created_by.full_name }}</span></dd></div>
+        <div><dt>Last modified</dt><dd>{{ order.updated_at|dt(full) }}</dd></div>
+        <div><dt>Submitted for approval</dt><dd>{% if order.submitted_at %}{{ order.submitted_at|dt(full) }}{% else %}<span class="faint">Not yet</span>{% endif %}</dd>{% if gaps.submitted %}<span class="gap">{{ gaps.submitted }} after it was created</span>{% endif %}</div>
+        {% if order.reviewed_at %}
+        <div><dt>{{ 'Sent back' if st == 'rejected' else 'Approved' }}</dt><dd>{{ order.reviewed_at|dt(full) }}<br><span class="faint small">by {{ order.reviewed_by.full_name if order.reviewed_by else 'accounts' }}</span></dd>{% if gaps.decision %}<span class="gap">Decision took {{ gaps.decision }} from submission</span>{% endif %}</div>
+        {% endif %}
+        {% if outbox %}
+        <div><dt>Queued for Tally</dt><dd>{{ outbox.created_at|dt(full) }}</dd>{% if gaps.queued %}<span class="gap">{{ gaps.queued }} after approval</span>{% endif %}</div>
+        <div><dt>First push attempt</dt><dd>{% if outbox.first_attempt_at %}{{ outbox.first_attempt_at|dt(full) }}{% else %}<span class="faint">Not tried yet</span>{% endif %}</dd></div>
+        <div><dt>Latest push attempt</dt><dd>{% if outbox.last_attempt_at %}{{ outbox.last_attempt_at|dt(full) }}<br><span class="faint small">{{ outbox.attempts }} attempt{{ 's' if outbox.attempts != 1 }}</span>{% else %}<span class="faint">Not tried yet</span>{% endif %}</dd></div>
+        <div><dt>Delivered to Tally</dt><dd>{% if outbox.sent_at %}{{ outbox.sent_at|dt(full) }}{% if outbox.response_reference %}<br><span class="faint small">Ref {{ outbox.response_reference }}</span>{% endif %}{% else %}<span class="faint">Not yet</span>{% endif %}</dd>{% if gaps.delivered %}<span class="gap">{{ gaps.delivered }} after approval</span>{% endif %}</div>
+        {% endif %}
+        {% if order.deleted_at %}<div><dt>Deleted</dt><dd>{{ order.deleted_at|dt(full) }}</dd></div>{% endif %}
+      </dl>
+    </section>
+
+    <section class="panel" aria-labelledby="hist-h">
+      <h2 id="hist-h">History</h2>
+      <ol class="timeline mt-m">
+        {% for h in history %}
+        <li><strong>{{ h.action|replace('so_', '')|replace('tally_', 'Tally ')|replace('_', ' ')|capitalize }}</strong>
+          <span class="small muted">{{ h.actor_email or 'System' }} · {{ h.at|dt(full) }}{% if h.ip_address %} · {{ h.ip_address }}{% endif %}</span>
+          {% if h.details and h.details.get('remarks') %}<span class="remark">{{ h.details['remarks'] }}</span>{% endif %}
+          {% if h.details and h.details.get('error') %}<span class="remark">Attempt {{ h.details.get('attempt') }}: {{ h.details['error'] }}</span>{% endif %}
+          {% if h.details and h.details.get('reference') %}<span class="small muted">Tally reference {{ h.details['reference'] }}</span>{% endif %}
+        </li>
+        {% else %}<li class="muted">No activity yet.</li>{% endfor %}
+      </ol>
+    </section>
+  </div>
+</div>
+
+{% if can_review %}
+<dialog id="reject-dialog" aria-labelledby="reject-title">
+  <form method="post" action="/orders/{{ order.id }}/reject">
+    {{ csrf() }}
+    <h2 id="reject-title">Send back to sales</h2>
+    <div class="field">
+      <label for="remarks">What needs to change?</label>
+      <textarea id="remarks" name="remarks" rows="4" maxlength="500" required minlength="3"></textarea>
+      <span class="hint">The sales person sees this message and can edit and resubmit.</span>
+    </div>
+    <div class="actions">
+      <button class="btn btn-danger" type="submit">Send back</button>
+      <button class="btn" type="button" data-close-dialog>Cancel</button>
+    </div>
+  </form>
+</dialog>
+{% endif %}
+{% if print_receipt %}{% include "_receipt.html" %}{% endif %}
+{% endblock %}

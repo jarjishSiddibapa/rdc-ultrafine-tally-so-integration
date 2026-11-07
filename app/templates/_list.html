@@ -1,0 +1,178 @@
+{# Shared building blocks for every list: toolbar (search, sort, filters, columns, download), table, pager. #}
+{% from "_macros.html" import icon, empty_art with context %}
+
+{# Default way to show one value, chosen by the column's kind. Pages override it for badges and links. #}
+{% macro cell(c, r) -%}
+{%- set v = c.raw(r) -%}
+{%- if v is none or v == '' -%}
+{%- elif v.label is defined -%}{{ v.label }}
+{%- elif c.kind == 'date' -%}{{ v|date }}
+{%- elif c.kind == 'datetime' -%}<span class="dt">{{ v|dt('%d %b %Y') }}</span><span class="cell-sub">{{ v|dt('%I:%M:%S %p') }}</span>
+{%- elif c.kind == 'money' -%}{{ v|inr }}
+{%- elif c.kind == 'qty' -%}{{ v|qty }}
+{%- elif c.kind == 'duration' -%}{{ v|duration }}
+{%- elif c.kind == 'bool' -%}{{ 'Yes' if v else 'No' }}
+{%- else -%}{{ v }}{%- endif -%}
+{%- endmacro %}
+
+{% macro total_cell(c, page) -%}
+{%- set v = page.totals.get(c.key) -%}
+{%- if v is not none -%}{% if c.kind == 'money' %}{{ v|inr }}{% elif c.kind == 'qty' %}{{ v|qty }}{% else %}{{ v|int }}{% endif %}{%- endif -%}
+{%- endmacro %}
+
+{% macro th(state, c) %}
+<th class="{{ 'num' if c.is_num }}" {% if c.can_sort %}aria-sort="{{ ('descending' if state.dir == 'desc' else 'ascending') if state.sort == c.key else 'none' }}"{% endif %}>
+  {%- if c.can_sort -%}
+  <a class="sort{{ ' on ' ~ state.dir if state.sort == c.key }}" href="{{ state.url(sort=c.key, dir=(('asc' if state.dir == 'desc' else 'desc') if state.sort == c.key else c.first_dir)) }}" title="Sort by {{ c.label }}">{{ c.label }}</a>
+  {%- else -%}{{ c.label }}{%- endif -%}
+</th>
+{% endmacro %}
+
+{% macro toolbar(state, page, noun='records', placeholder='Search', own=[], download=True, download_label='Download') %}
+<form class="listbar" method="get" role="search" data-listbar>
+  {% for k, v in state.extras.items() if k not in own %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+  <div class="listbar-row">
+    <div class="field grow">
+      <label for="lq">Search</label>
+      <div class="search">{{ icon('search', 'i-s') }}<input id="lq" name="q" type="search" value="{{ state.q }}" maxlength="80" placeholder="{{ placeholder }}" autocomplete="off"></div>
+    </div>
+    <div class="field">
+      <label for="lsort">Sort by</label>
+      <select id="lsort" name="sort">{% for c in state.spec.cols if c.can_sort %}<option value="{{ c.key }}" {% if state.sort == c.key %}selected{% endif %}>{{ c.label }}</option>{% endfor %}</select>
+    </div>
+    <div class="field">
+      <label for="ldir">Order</label>
+      <select id="ldir" name="dir"><option value="desc" {% if state.dir == 'desc' %}selected{% endif %}>Highest / newest first</option><option value="asc" {% if state.dir == 'asc' %}selected{% endif %}>Lowest / oldest first</option></select>
+    </div>
+    <div class="field">
+      <label for="lpp">Rows per page</label>
+      <select id="lpp" name="per_page" data-autosubmit>{% for n in [10, 20, 25, 50, 100, 200] %}<option value="{{ n }}" {% if state.per_page == n %}selected{% endif %}>{{ n }}</option>{% endfor %}</select>
+    </div>
+    <div class="actions">
+      <button class="btn btn-primary" type="submit">Apply</button>
+      {% if download %}
+      <details class="menu">
+        <summary class="btn">{{ download_label }}</summary>
+        <div class="menu-list" role="menu">
+          <a role="menuitem" href="{{ state.url(export='xlsx') }}" download>Excel (.xlsx)</a>
+          <a role="menuitem" href="{{ state.url(export='csv') }}" download>CSV (.csv)</a>
+          <span class="menu-note">Everything that matches your search and filters, all columns, not just this page.</span>
+        </div>
+      </details>
+      {% endif %}
+    </div>
+  </div>
+  {{ caller() if caller }}
+  <details class="more" {% if state.filter_count %}open{% endif %}>
+    <summary>Filters{% if state.filter_count %}<span class="n">{{ state.filter_count }}</span>{% endif %}</summary>
+    <div class="filter-grid">
+      {% for c in state.spec.cols if c.can_filter %}
+      {% set n = 'f_' ~ c.key %}
+      <div class="field">
+        {% if c.kind in ('date', 'datetime', 'number', 'money', 'qty', 'duration') %}
+        <span class="label">{{ c.label }}{% if c.kind == 'duration' %} <span class="faint">(seconds)</span>{% endif %}</span>
+        <div class="range">
+          <input name="{{ n }}_from" aria-label="{{ c.label }} from" type="{{ 'date' if c.kind in ('date', 'datetime') else 'text' }}" {% if c.kind not in ('date', 'datetime') %}inputmode="decimal" placeholder="Min"{% endif %} value="{{ state.raw.get(n ~ '_from', '') }}">
+          <span class="faint" aria-hidden="true">to</span>
+          <input name="{{ n }}_to" aria-label="{{ c.label }} to" type="{{ 'date' if c.kind in ('date', 'datetime') else 'text' }}" {% if c.kind not in ('date', 'datetime') %}inputmode="decimal" placeholder="Max"{% endif %} value="{{ state.raw.get(n ~ '_to', '') }}">
+        </div>
+        {% elif c.kind == 'choice' %}
+        <label for="{{ n }}">{{ c.label }}</label>
+        <select id="{{ n }}" name="{{ n }}"><option value="{{ 'all' if c.key in state.spec.defaults else '' }}">Any</option>{% for v, lbl in c.choices %}<option value="{{ v }}" {% if state.raw.get(n) == v %}selected{% endif %}>{{ lbl }}</option>{% endfor %}</select>
+        {% elif c.kind == 'bool' %}
+        <label for="{{ n }}">{{ c.label }}</label>
+        <select id="{{ n }}" name="{{ n }}"><option value="">Any</option><option value="1" {% if state.raw.get(n) == '1' %}selected{% endif %}>Yes</option><option value="0" {% if state.raw.get(n) == '0' %}selected{% endif %}>No</option></select>
+        {% else %}
+        <label for="{{ n }}">{{ c.label }} <span class="faint">contains</span></label>
+        <input id="{{ n }}" name="{{ n }}" type="text" maxlength="80" value="{{ state.raw.get(n, '') }}" autocomplete="off">
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    <div class="actions">
+      <button class="btn btn-primary" type="submit">Apply filters</button>
+      {% if state.filter_count or state.q %}<a class="btn btn-quiet" href="{{ state.clear_url() }}">Clear all</a>{% endif %}
+    </div>
+  </details>
+  <details class="more">
+    <summary>Columns<span class="n">{{ state.visible|length }}/{{ state.spec.cols|length }}</span></summary>
+    <div class="col-grid">
+      {% for c in state.spec.cols %}
+      <div class="check"><input id="col-{{ c.key }}" type="checkbox" name="cols" value="{{ c.key }}" {% if c.key in state.visible_keys %}checked{% endif %}><label for="col-{{ c.key }}">{{ c.label }}</label></div>
+      {% endfor %}
+    </div>
+    <div class="actions">
+      <button class="btn btn-primary" type="submit">Show these columns</button>
+      <a class="btn btn-quiet" href="{{ state.url(cols=None) }}">Standard columns</a>
+    </div>
+  </details>
+</form>
+{% set chips = state.chips() %}
+{% if chips %}
+<ul class="fchips" aria-label="Active filters">
+  {% for text, href in chips %}<li><a href="{{ href }}" title="Remove this filter">{{ text }}<span aria-hidden="true">&times;</span><span class="sr-only"> remove</span></a></li>{% endfor %}
+  <li><a class="fchip-clear" href="{{ state.clear_url() }}">Clear all</a></li>
+</ul>
+{% endif %}
+{% endmacro %}
+
+{# The table. cellfn(c, r) and actionfn(r) are optional page macros for badges, links and row buttons. #}
+{% macro table(state, page, cellfn=none, actionfn=none, caption='') %}
+<div class="panel flush">
+  <div class="table-wrap">
+    <table class="{{ 'wide' if state.visible|length > 9 }}">
+      {% if caption %}<caption class="sr-only">{{ caption }}</caption>{% endif %}
+      <thead><tr>{% for c in state.visible %}{{ th(state, c) }}{% endfor %}{% if actionfn %}<th><span class="sr-only">Actions</span></th>{% endif %}</tr></thead>
+      <tbody>
+      {% for r in page.rows %}
+        <tr>
+          {% for c in state.visible %}<td class="{{ 'num' if c.is_num }}">{% if cellfn %}{{ cellfn(c, r) }}{% else %}{{ cell(c, r) }}{% endif %}</td>{% endfor %}
+          {% if actionfn %}<td>{{ actionfn(r) }}</td>{% endif %}
+        </tr>
+      {% endfor %}
+      </tbody>
+      {% if page.totals %}
+      <tfoot><tr class="totals-row">
+        {% for c in state.visible %}<td class="{{ 'num' if c.is_num }}">{% if loop.first %}<b>Total of all {{ page.total }} matching</b>{% else %}<b>{{ total_cell(c, page) }}</b>{% endif %}</td>{% endfor %}
+        {% if actionfn %}<td></td>{% endif %}
+      </tr></tfoot>
+      {% endif %}
+    </table>
+  </div>
+</div>
+{% endmacro %}
+
+{% macro pager(state, page) %}
+{% if page.total %}
+<nav class="pager2" aria-label="Pages">
+  <p class="small muted pager-count">Showing <b>{{ page.start }}</b> to <b>{{ page.end }}</b> of <b>{{ page.total }}</b></p>
+  {% if page.pages > 1 %}
+  <div class="pager-nav">
+    {% if page.page > 1 %}<a class="btn btn-small" href="{{ state.url(page=1) }}" aria-label="First page">&laquo;</a><a class="btn btn-small" href="{{ state.url(page=page.page - 1) }}">Previous</a>{% endif %}
+    {% for n in page.window() %}
+      {% if n is none %}<span class="faint" aria-hidden="true">&hellip;</span>
+      {% elif n == page.page %}<span class="btn btn-small btn-primary" aria-current="page">{{ n }}</span>
+      {% else %}<a class="btn btn-small" href="{{ state.url(page=n) }}">{{ n }}</a>{% endif %}
+    {% endfor %}
+    {% if page.page < page.pages %}<a class="btn btn-small" href="{{ state.url(page=page.page + 1) }}">Next</a><a class="btn btn-small" href="{{ state.url(page=page.pages) }}" aria-label="Last page">&raquo;</a>{% endif %}
+  </div>
+  <form class="pager-jump" method="get">
+    {% for k, v in state.pairs(exclude=('page',)) %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+    <label for="jump" class="small muted">Go to page</label>
+    <input id="jump" name="page" type="number" min="1" max="{{ page.pages }}" value="{{ page.page }}" inputmode="numeric">
+    <button class="btn btn-small" type="submit">Go</button>
+    <span class="small muted">of {{ page.pages }}</span>
+  </form>
+  {% endif %}
+</nav>
+{% endif %}
+{% endmacro %}
+
+{% macro empty(state, noun='records', hint='') %}
+<div class="panel empty">
+  {{ empty_art() }}
+  <h3>No {{ noun }} match</h3>
+  <p>{% if state.q or state.filter_count %}Nothing matches your search and filters. Try widening them.{% else %}{{ hint or 'There is nothing here yet.' }}{% endif %}</p>
+  {% if state.q or state.filter_count %}<a class="btn" href="{{ state.clear_url() }}">Clear search and filters</a>{% endif %}
+</div>
+{% endmacro %}

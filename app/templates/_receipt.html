@@ -1,0 +1,76 @@
+{# One-off "receipt printer" shown right after a sales order is submitted. Pure CSS animation (see receipt.css);
+   app.js only opens/closes the dialog. Mirrors the SO fields from the SOP. #}
+<dialog id="receipt-dialog" class="rp" aria-labelledby="rp-title" data-receipt>
+ <div class="rp-fit" data-fit>
+  <div class="rp-machine">
+    <div class="rp-head">
+      <div class="rp-status" id="rp-title" role="status" aria-live="polite">
+        <span class="rp-ico rp-ico-spin" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 3a9 9 0 1 0 9 9"/></svg></span>
+        <span class="rp-ico rp-ico-done" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm4.7 8.2-5.5 5.5a1 1 0 0 1-1.4 0l-2.5-2.5a1 1 0 1 1 1.4-1.4l1.8 1.8 4.8-4.8a1 1 0 1 1 1.4 1.4Z"/></svg></span>
+        <span class="rp-txt">
+          <span class="rp-t rp-t1">Creating your sales order</span>
+          <span class="rp-t rp-t2">Printing your order slip</span>
+          <span class="rp-t rp-t3">Sent to Accounts for approval</span>
+        </span>
+      </div>
+      <div class="rp-total"><small>Total</small>Rs {{ order.total_amount|inr }}</div>
+    </div>
+    <div class="rp-screen" aria-hidden="true"><span class="rp-led"></span>{{ order.so_number }}</div>
+    <div class="rp-slot" aria-hidden="true"></div>
+  </div>
+
+  <div class="rp-out">
+    <div class="rp-shadow" aria-hidden="true"></div>
+    <article class="rp-paper" aria-label="Sales order {{ order.so_number }}">
+      <header class="rc-top">
+        <img class="rc-logo" src="/static/img/ultrafine-logo.png" width="302" height="80" alt="Ultrafine">
+        <span>{{ order.so_type.short|upper }}</span>
+        <strong class="rc-no">{{ order.so_number }}</strong>
+        <span>{{ order.order_date|date }}</span>
+      </header>
+
+      <div class="rc-rule"></div>
+      <dl class="rc-kv">
+        <div><dt>Party A/C</dt><dd>{{ order.party_name }}</dd></div>
+        <div><dt>Payment term</dt><dd>{{ order.payment_term }}</dd></div>
+        <div><dt>Customer PO no.</dt><dd>{{ order.customer_po_number }}</dd></div>
+        <div><dt>Billing address</dt><dd>{{ order.billing_address }}{% if order.billing_state_code %}, {{ order.billing_state_code|state_name }}{% endif %}</dd></div>
+        <div><dt>Shipping address</dt><dd>{{ order.shipping_address }}{% if order.shipping_state_code %}, {{ order.shipping_state_code|state_name }}{% endif %}</dd></div>
+        {% if order.plant_name %}<div><dt>Plant</dt><dd>{{ order.plant_name }}</dd></div>{% endif %}
+        <div><dt>Sales ledger</dt><dd>{{ order.sales_ledger_name }}</dd></div>
+      </dl>
+
+      <div class="rc-rule"></div>
+      <ol class="rc-items">
+        {% for i in order.items[:6] %}
+        <li><span class="rc-name">{{ i.item_name }}</span>
+            <span class="rc-calc">{{ i.quantity|qty }} {{ i.unit }} x Rs {{ i.rate|inr }} / {{ i.unit }}</span><b>{{ i.amount|inr }}</b></li>
+        {% endfor %}
+        {% if order.items|length > 6 %}<li class="rc-more">+ {{ order.items|length - 6 }} more item{{ 's' if order.items|length - 6 > 1 else '' }}</li>{% endif %}
+      </ol>
+
+      <div class="rc-rule"></div>
+      <div class="rc-sum">
+        <div><span>Subtotal</span><span>{{ order.subtotal|inr }}</span></div>
+        {% if order.tax_mode.value == 'cgst_sgst' %}
+        <div><span>Output CGST</span><span>{{ order.cgst_amount|inr }}</span></div>
+        <div><span>Output SGST</span><span>{{ order.sgst_amount|inr }}</span></div>
+        {% else %}
+        <div><span>Output IGST</span><span>{{ order.igst_amount|inr }}</span></div>
+        {% endif %}
+        <div class="rc-grand"><span>Total (Rs)</span><span>{{ order.total_amount|inr }}</span></div>
+      </div>
+
+      <div class="rc-rule"></div>
+      <p class="rc-narr"><span>Narration</span>{{ order.narration }}</p>
+      <p class="rc-narr rc-rem"><span>Remarks</span>{{ order.remarks }}</p>
+      <p class="rc-foot">Waiting for approval by Accounts Head</p>
+    </article>
+  </div>
+
+  <div class="rp-actions">
+    <a class="btn btn-primary" href="/orders/{{ order.id }}" data-receipt-close>View order</a>
+    <a class="btn rp-new" href="/orders/new" data-receipt-new>New order</a>
+  </div>
+ </div>
+</dialog>

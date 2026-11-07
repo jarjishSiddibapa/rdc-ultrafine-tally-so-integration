@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf, icon, split with context %}
+{% block title %}Sign in · {{ app_name }}{% endblock %}
+{% block shell %}
+<div class="login">
+  <section class="login-hero" aria-label="About this application">
+    <div class="aurora" aria-hidden="true"><i class="a1"></i><i class="a2"></i><i class="a3"></i></div>
+    <a class="brand brand-logo" href="/login" aria-label="Ultrafine"><span class="logo-plate logo-plate-lg"><img src="/static/img/ultrafine-logo.png" width="302" height="80" alt="Ultrafine"></span></a>
+    <div>
+      <h1>{{ split('Ultrafine Sales Orders') }}</h1>
+      <p class="lead">Create, approve and push sales orders to Tally.</p>
+    </div>
+    <ol class="flow">
+      <li><span class="no">{{ icon('edit') }}</span><div><b>Sales person creates SO</b></div></li>
+      <li><span class="no">{{ icon('audit') }}</span><div><b>SO gets approved by Accounts Head</b></div></li>
+      <li><span class="no">{{ icon('sync') }}</span><div><b>Data is pushed to Tally instantly</b></div></li>
+    </ol>
+    <div class="marquee" aria-hidden="true">
+      <div class="marquee-track">
+        <span>Ultrafine</span><span>Create SO</span><span>Approve</span><span>Push to Tally</span><span>Ultrafine</span><span>Create SO</span><span>Approve</span><span>Push to Tally</span><span>Ultrafine</span><span>Create SO</span><span>Approve</span><span>Push to Tally</span>
+        <span>Ultrafine</span><span>Create SO</span><span>Approve</span><span>Push to Tally</span><span>Ultrafine</span><span>Create SO</span><span>Approve</span><span>Push to Tally</span><span>Ultrafine</span><span>Create SO</span><span>Approve</span><span>Push to Tally</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="login-main">
+    <div class="login-card">
+      <div>
+        <h2>Welcome back</h2>
+        <p class="sub">Sign in with your work email.</p>
+      </div>
+      {% if error %}<div class="notice notice-error" role="alert">{{ icon('alert') }}<span>{{ error }}</span></div>{% endif %}
+      {% if flash %}<div class="notice notice-{{ flash.level }}" role="status">{{ icon('info') }}<span>{{ flash.message }}</span></div>{% endif %}
+      <form method="post" action="/login" class="stack-s" novalidate>
+        {{ csrf() }}
+        <input type="hidden" name="next" value="{{ next }}">
+        <div class="field">
+          <label for="email">Email</label>
+          <input id="email" name="email" type="email" value="{{ email }}" autocomplete="username" required maxlength="254" autofocus placeholder="you@company.com">
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <div class="pw-wrap">
+            <input id="password" name="password" type="password" autocomplete="current-password" required maxlength="256">
+            <button class="btn btn-quiet btn-small pw-toggle" type="button" data-toggle-password="password" aria-controls="password">Show</button>
+          </div>
+          <span class="hint"><a href="/forgot-password">Forgot your password?</a> We will email you a link.</span>
+        </div>
+        <button class="btn btn-primary btn-block" type="submit">Sign in</button>
+      </form>
+    </div>
+    <footer class="footer"><span>Made with ❤️ by Jarjish</span></footer>
+  </div>
+</div>
+{% endblock %}

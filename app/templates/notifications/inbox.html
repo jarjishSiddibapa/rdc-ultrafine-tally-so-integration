@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, csrf with context %}
+{% from "_list.html" import toolbar, table, pager, empty, cell with context %}
+{% block title %}Notifications · {{ app_name }}{% endblock %}
+
+{% macro n_cell(c, r) %}
+  {%- if c.key == 'title' -%}
+    <a class="link-strong notif-title {{ 'is-unread' if not r.read_at }}" href="/notifications/{{ r.id }}/open"><span class="lvl lvl-{{ r.level }}" aria-hidden="true"></span>{{ r.title }}{% if not r.read_at %}<span class="sr-only"> (unread)</span>{% endif %}</a>
+  {%- elif c.key == 'status' -%}<span class="badge {{ '' if r.read_at else 'badge-accent' }}">{{ 'Read' if r.read_at else 'Unread' }}</span>
+  {%- else -%}{{ cell(c, r) }}{%- endif -%}
+{% endmacro %}
+
+{% macro n_actions(r) %}
+{% set back = request.url.path ~ (('?' ~ request.url.query) if request.url.query else '') %}
+<div class="row-actions">
+  <form method="post" action="/notifications/{{ r.id }}/{{ 'unread' if r.read_at else 'read' }}">{{ csrf() }}<input type="hidden" name="next" value="{{ back }}"><button class="btn btn-small" type="submit">{{ 'Mark unread' if r.read_at else 'Mark read' }}</button></form>
+  <form method="post" action="/notifications/{{ r.id }}/delete">{{ csrf() }}<input type="hidden" name="next" value="{{ back }}"><button class="btn btn-small btn-danger" type="submit" data-confirm="Remove this notification from your list?" data-confirm-label="Remove">Remove</button></form>
+</div>
+{% endmacro %}
+
+{% block content %}
+<div class="page-head">
+  <div><h1>Notifications</h1><p>{{ unread }} unread. Every notification carries the time it was raised.</p></div>
+  <div class="actions">
+    <a class="btn" href="/account/notifications">Notification settings</a>
+    {% if unread %}<form method="post" action="/notifications/read-all">{{ csrf() }}<button class="btn btn-primary" type="submit">{{ icon('check') }}Mark all as read</button></form>{% endif %}
+  </div>
+</div>
+
+<nav class="tabs" aria-label="Filter notifications">
+  <a href="{{ st.url(f_status=None) }}" {% if not st.raw.get('f_status') %}aria-current="page"{% endif %}>All</a>
+  <a href="{{ st.url(f_status='unread') }}" {% if st.raw.get('f_status') == 'unread' %}aria-current="page"{% endif %}>Unread<span class="n">{{ unread }}</span></a>
+  <a href="{{ st.url(f_status='read') }}" {% if st.raw.get('f_status') == 'read' %}aria-current="page"{% endif %}>Read</a>
+</nav>
+
+{{ toolbar(st, page, 'notifications', 'Search notifications...') }}
+
+{% if page.rows %}
+{{ table(st, page, cellfn=n_cell, actionfn=n_actions, caption='Notifications') }}
+{{ pager(st, page) }}
+{% else %}
+{{ empty(st, 'notifications', 'You are all caught up. New activity on your orders will show up here.') }}
+{% endif %}
+{% endblock %}

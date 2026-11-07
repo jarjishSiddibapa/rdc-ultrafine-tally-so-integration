@@ -70,6 +70,16 @@ def logout(request: Request, db: Session = Depends(get_db), user: User = Depends
     return resp
 
 
+@router.get("/account")
+def account_home(user: User = Depends(current_user)):
+    return redirect("/account/profile")
+
+
+@router.get("/account/profile")
+def profile_page(request: Request, user: User = Depends(current_user)):
+    return render(request, "account/profile.html", {})
+
+
 @router.get("/account/password")
 def password_page(request: Request, user: User = Depends(current_user)):
     return render(request, "password.html", {"forced": user.must_change_password, "problems": []})

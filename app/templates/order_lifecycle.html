@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icon, status_badge with context %}
+{% set label = order.so_number or ('Draft #' ~ order.id) %}
+{% block title %}Lifecycle · {{ label }} · {{ app_name }}{% endblock %}
+{% block content %}
+<nav class="crumbs" aria-label="Breadcrumb"><a href="/reports/order-lifecycle">Order lifecycle</a><span aria-hidden="true">/</span><a href="/orders/{{ order.id }}">{{ label }}</a><span aria-hidden="true">/</span><span>Lifecycle</span></nav>
+
+<div class="page-head">
+  <div>
+    <h1>Lifecycle of {{ label }}</h1>
+    <p>{{ order.party_name }} · Rs {{ order.total_amount|inr }} · {{ order.so_type.short }}</p>
+  </div>
+  <div class="actions"><a class="btn" href="/orders/{{ order.id }}">{{ icon('back') }}Back to the order</a></div>
+</div>
+
+<div class="life-now life-{{ lc.stage_tone }}" role="status">
+  <span class="life-dot" aria-hidden="true"></span>
+  <div><b>{{ lc.stage }}</b><span>{{ 'Open for ' if lc.total_open else 'Completed in ' }}{{ lc.total }}{% if lc.sent_back %} · sent back {{ lc.sent_back }} time{{ 's' if lc.sent_back != 1 }}{% endif %}{% if lc.attempts > 1 %} · {{ lc.attempts }} Tally attempts{% endif %}</span></div>
+</div>
+
+<div class="split split-wide">
+  <section class="panel" aria-labelledby="jny-h">
+    <h2 id="jny-h">The journey</h2>
+    <ol class="jny mt-m">
+      {% for s in lc.steps %}
+      <li class="jny-{{ s.tone }}">
+        {% if s.since_prev %}<span class="jny-gap">{{ s.since_prev }} later</span>{% endif %}
+        <div class="jny-card">
+          <span class="jny-mark" aria-hidden="true"></span>
+          <div>
+            <strong>{{ s.title }}</strong>
+            <span class="small muted">{{ s.who }} · {{ s.at|dt }}</span>
+            {% if s.note %}<span class="remark">{{ s.note }}</span>{% endif %}
+          </div>
+        </div>
+      </li>
+      {% else %}<li class="muted">Nothing has happened to this order yet.</li>{% endfor %}
+      {% if lc.total_open and not order.deleted_at %}<li class="jny-next"><div class="jny-card"><span class="jny-mark" aria-hidden="true"></span><div><strong>{{ lc.stage }}</strong><span class="small muted">You are here</span></div></div></li>{% endif %}
+    </ol>
+  </section>
+
+  <aside class="stack">
+    <section class="panel" aria-labelledby="time-h">
+      <h2 id="time-h">Where the time went</h2>
+      <dl class="waits mt-m">
+        {% for name, dur, running in lc.waits %}
+        <div><dt>{{ name }}</dt><dd>{{ dur }}{% if running %} <span class="badge badge-accent">still running</span>{% endif %}</dd></div>
+        {% endfor %}
+        <div class="waits-total"><dt>Start to finish</dt><dd>{{ lc.total }}{% if lc.total_open %} <span class="badge badge-accent">so far</span>{% endif %}</dd></div>
+      </dl>
+    </section>
+    <section class="panel" aria-labelledby="facts-h">
+      <h2 id="facts-h">Order at a glance</h2>
+      <dl class="kv mt-m">
+        <div><dt>Created by</dt><dd>{{ order.created_by.full_name }}</dd></div>
+        <div><dt>Plant</dt><dd>{{ order.plant_name or 'Not set' }}</dd></div>
+        <div><dt>Customer PO</dt><dd>{{ order.customer_po_number }}</dd></div>
+        {% if outbox and outbox.response_reference %}<div><dt>Tally reference</dt><dd>{{ outbox.response_reference }}</dd></div>{% endif %}
+      </dl>
+    </section>
+  </aside>
+</div>
+{% endblock %}

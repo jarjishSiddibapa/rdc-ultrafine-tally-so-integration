@@ -193,6 +193,16 @@ def detail(order_id: int, request: Request, db: Session = Depends(get_db), user:
     })
 
 
+@router.get("/{order_id}/lifecycle")
+def lifecycle_page(order_id: int, request: Request, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    """One order's whole journey: every step with who and when, and where the time went."""
+    from app.services import lifecycle as lifecycle_service
+
+    order = _get_order(db, user, order_id)
+    outbox = db.execute(select(TallyOutbox).where(TallyOutbox.order_id == order.id)).scalar_one_or_none()
+    return render(request, "order_lifecycle.html", {"order": order, "lc": lifecycle_service.build(db, order, outbox), "outbox": outbox})
+
+
 def _transition(order_id: int, db: Session, user: User, fn, ok_message: str, redirect_to: str | None = None):
     order = _get_order(db, user, order_id, lock=True)
     try:

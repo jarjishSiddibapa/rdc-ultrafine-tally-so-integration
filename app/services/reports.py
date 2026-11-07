@@ -60,6 +60,17 @@ def _turnaround(db: Session, user: User, lo: date | None, hi: date | None) -> Bu
     return Built(stmt, spec, True)
 
 
+def _lifecycle(db: Session, user: User, lo: date | None, hi: date | None) -> Built:
+    """One row per order that has left draft, with each milestone; a row opens that order's full journey."""
+    stmt = visible_orders(select(O), user).where(O.submitted_at.is_not(None))
+    for c in range_conditions(O.created_at, "datetime", lo, hi):
+        stmt = stmt.where(c)
+    spec = specs.pick(specs.order_spec(db), ["so_number", "party_name", "total_amount", "status", "tally_status", "created_by", "created_at",
+                                             "submitted_at", "sent_back_count", "reviewed_by", "reviewed_at", "decision_time",
+                                             "sent_at", "push_time", "total_time"], default_sort="created_at", tiebreak=O.id.desc())
+    return Built(stmt, spec, True)
+
+
 def _tally_timing(db: Session, user: User, lo: date | None, hi: date | None) -> Built:
     from app.models import TallyOutbox
 
@@ -269,6 +280,8 @@ def _user_activity(db: Session, user: User, lo: date | None, hi: date | None) ->
 
 
 REPORTS: list[Report] = [
+    Report("order-lifecycle", "Order lifecycle", "Follow each sales order from creation to Tally: when it was submitted, approved or sent back, delivered, and how long each stage took. Open a row for its full story.",
+           ALL, "creation time", "Orders", _lifecycle),
     Report("order-register", "Order register", "Every order with all its details and every timestamp: created, submitted, approved or sent back, queued, pushed to Tally.",
            ALL, "order date", "Orders", _register),
     Report("approval-trail", "Approval trail", "One row per action on an order: created, submitted, withdrawn, approved, sent back, deleted, with who did it, when and from where.",

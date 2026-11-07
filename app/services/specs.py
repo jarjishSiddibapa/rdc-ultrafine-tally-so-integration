@@ -63,6 +63,15 @@ def show_all(spec: ListSpec) -> ListSpec:
 
 
 # --------------------------------------------------------------------------- sales orders
+def _sent_back(order: SalesOrder) -> int:
+    """How many times accounts sent this order back (one small query per row shown)."""
+    from sqlalchemy.orm import object_session
+
+    s = object_session(order)
+    return s.execute(select(func.count(AuditLog.id)).where(
+        AuditLog.entity_type == "sales_order", AuditLog.action == "so_rejected", AuditLog.entity_id == order.id)).scalar_one() if s else 0
+
+
 def order_spec(db: Session | None = None, *, defaults: dict[str, str] | None = None) -> ListSpec:
     O = SalesOrder
 
@@ -109,6 +118,12 @@ def order_spec(db: Session | None = None, *, defaults: dict[str, str] | None = N
         Col("push_attempts", "Push attempts", ob(TallyOutbox.attempts), "number", default=False, value=ob_attr("attempts")),
         Col("push_time", "Approval to Tally", _secs(O.reviewed_at, ob(TallyOutbox.sent_at)), "duration", default=False,
             value=lambda o: (o.outbox.sent_at - o.reviewed_at).total_seconds() if o.outbox and o.outbox.sent_at and o.reviewed_at else None),
+        Col("sent_back_count", "Times sent back", select(func.count(AuditLog.id)).where(
+            AuditLog.entity_type == "sales_order", AuditLog.action == "so_rejected", AuditLog.entity_id == O.id)
+            .correlate_except(AuditLog).scalar_subquery(), "number", default=False,
+            value=_sent_back),
+        Col("total_time", "Start to finish", _secs(O.created_at, ob(TallyOutbox.sent_at)), "duration", default=False,
+            value=lambda o: (o.outbox.sent_at - o.created_at).total_seconds() if o.outbox and o.outbox.sent_at else None),
         Col("remarks", "Remarks", O.remarks, search=True, default=False),
         Col("narration", "Narration", O.narration, search=True, default=False, sortable=False),
         Col("updated_at", "Last modified", O.updated_at, "datetime", default=False),

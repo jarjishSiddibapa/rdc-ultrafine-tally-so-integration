@@ -10,7 +10,7 @@
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="preload" href="/static/fonts/wix-madefor-text.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/static/fonts/wix-madefor-display.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="/static/css/app.css?v=18">
+  <link rel="stylesheet" href="/static/css/app.css?v=22">
   <link rel="stylesheet" href="/static/css/motion.css?v=3">
   <link rel="stylesheet" href="/static/css/receipt.css?v=5">
 </head>
@@ -31,6 +31,7 @@
       <a href="/orders" {% if path.startswith('/orders') and path != '/orders/new' %}aria-current="page"{% endif %}>{{ icon('orders') }}{{ 'Approvals' if user.role == Role.ACCOUNTS else 'Orders' }}{% if nav_pending %}<span class="count" aria-label="{{ nav_pending }} waiting">{{ nav_pending }}</span>{% endif %}</a>
       {% if user.role == Role.SALES %}<a href="/orders/new" {% if path == '/orders/new' %}aria-current="page"{% endif %}>{{ icon('plus') }}New order</a>{% endif %}
       <a href="/reports" {% if path.startswith('/reports') %}aria-current="page"{% endif %}>{{ icon('reports') }}Reports</a>
+      <a href="/notifications" {% if path == '/notifications' or (path.startswith('/notifications/') ) %}aria-current="page"{% endif %}>{{ icon('bell') }}Notifications<span class="count" data-nav-unread aria-label="{{ nav_unread }} unread" {% if not nav_unread %}hidden{% endif %}>{{ '99+' if nav_unread > 99 else nav_unread }}</span></a>
       {% if user.role in (Role.ADMIN, Role.ACCOUNTS) %}
       <div class="nav-group">Master data</div>
       <a href="/masters/plants" {% if path.startswith('/masters/plants') %}aria-current="page"{% endif %}>{{ icon('plant') }}Plants</a>
@@ -43,18 +44,19 @@
       <a href="/admin/tally" {% if path.startswith('/admin/tally') %}aria-current="page"{% endif %}>{{ icon('sync') }}Tally queue</a>
       <a href="/admin/mail" {% if path.startswith('/admin/mail') %}aria-current="page"{% endif %}>{{ icon('mail') }}Email log</a>
       <a href="/admin/audit" {% if path.startswith('/admin/audit') %}aria-current="page"{% endif %}>{{ icon('audit') }}Audit log</a>
-      <a href="/admin/settings" {% if path.startswith('/admin/settings') %}aria-current="page"{% endif %}>{{ icon('settings') }}Settings</a>
+      <a href="/admin/settings" {% if path.startswith('/admin/settings') %}aria-current="page"{% endif %}>{{ icon('cog') }}System settings</a>
       {% endif %}
+      <div class="nav-group">Account</div>
+      <a href="/account" {% if path.startswith('/account') %}aria-current="page"{% endif %}>{{ icon('settings') }}Settings</a>
     </nav>
     <div class="me">
       <div class="me-row">
         <span class="avatar" aria-hidden="true">{{ initials(user.full_name) }}</span>
-        <a href="/account/password" title="Change your password">
+        <div class="me-text">
           <span class="me-name">{{ user.full_name }}</span>
           <span class="me-role">{{ user.role.label }}</span>
-        </a>
+        </div>
       </div>
-      <div class="me-links"><a href="/account/password">Password</a><a href="/account/notifications">Notification settings</a></div>
       <form method="post" action="/logout">
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <button class="btn btn-small signout" type="submit">{{ icon('logout', 'i-s') }}Sign out</button>
@@ -110,7 +112,7 @@
     </div>
   </form>
 </dialog>
-<script src="/static/js/app.js?v=14" defer></script>
+<script src="/static/js/app.js?v=15" defer></script>
 <script src="/static/js/motion.js?v=2" defer></script>
 </body>
 </html>

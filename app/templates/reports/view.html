@@ -1,5 +1,6 @@
 {% extends "base.html" %}
-{% from "_list.html" import toolbar, table, pager, empty with context %}
+{% from "_list.html" import toolbar, table, pager, empty, cell with context %}
+{% from "_macros.html" import icon with context %}
 {% block title %}{{ report.title }} · {{ app_name }}{% endblock %}
 {% block content %}
 <nav class="crumbs" aria-label="Breadcrumb"><a href="/reports">Reports</a><span aria-hidden="true">/</span><span>{{ report.title }}</span></nav>
@@ -21,8 +22,9 @@
 </div>
 {% endcall %}
 
+{% macro life_cell(c, r) %}{% if c.key == 'so_number' %}<a class="cell-main" href="/orders/{{ r.id }}/lifecycle" title="See the full lifecycle of this order">{{ r.so_number }}</a>{% else %}{{ cell(c, r) }}{% endif %}{% endmacro %}
 {% if page.rows %}
-{{ table(st, page, caption=report.title) }}
+{% if report.slug == 'order-lifecycle' %}{{ table(st, page, cellfn=life_cell, caption=report.title) }}{% else %}{{ table(st, page, caption=report.title) }}{% endif %}
 {{ pager(st, page) }}
 {% else %}
 {{ empty(st, 'rows', 'Nothing was recorded in this period.') }}

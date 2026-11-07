@@ -1,30 +1,33 @@
 {% extends "base.html" %}
 {% from "_macros.html" import icon, csrf with context %}
-{% block title %}Notification settings · {{ app_name }}{% endblock %}
+{% from "account/_head.html" import head with context %}
+{% block title %}Notifications · Settings · {{ app_name }}{% endblock %}
 {% block content %}
-<nav class="crumbs" aria-label="Breadcrumb"><a href="/notifications">Notifications</a><span aria-hidden="true">/</span><span>Settings</span></nav>
-<div class="page-head"><div><h1>Notification settings</h1><p>Choose what appears in the app and what is also emailed to <b>{{ user.email }}</b>.</p></div></div>
-
-<form method="post" action="/account/notifications" class="panel flush">
-  {{ csrf() }}
-  <div class="table-wrap">
-    <table>
-      <caption class="sr-only">Notification choices</caption>
-      <thead><tr><th>What</th><th>In the app</th><th>By email</th></tr></thead>
-      <tbody>
-      {% for r in rows %}
-        <tr>
-          <td><span class="cell-main">{{ r.label }}</span><span class="cell-sub">{{ r.help }}</span></td>
-          <td data-label="In the app"><div class="check"><input id="app_{{ r.key }}" type="checkbox" name="app_{{ r.key }}" {% if r.in_app %}checked{% endif %} {% if r.locked %}disabled{% endif %}><label for="app_{{ r.key }}"><span class="sr-only">{{ r.label }}: </span>Show in the app</label></div></td>
-          <td data-label="By email"><div class="check"><input id="mail_{{ r.key }}" type="checkbox" name="mail_{{ r.key }}" {% if r.email %}checked{% endif %} {% if r.locked %}disabled{% endif %}><label for="mail_{{ r.key }}"><span class="sr-only">{{ r.label }}: </span>Send by email</label></div></td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  <div class="panel-foot actions">
-    <button class="btn btn-primary" type="submit">Save settings</button>
-    <a class="btn btn-quiet" href="/notifications">Back to notifications</a>
-  </div>
-</form>
+{{ head('notifications') }}
+<section class="settings-panel wide" aria-labelledby="np-h">
+  <h2 id="np-h">Notification preferences</h2>
+  <p class="lede">Choose what shows in the app and what is also emailed to <b>{{ user.email }}</b>. Account security notices are always on.</p>
+  <form method="post" action="/account/notifications" class="panel flush">
+    {{ csrf() }}
+    <div class="table-wrap">
+      <table>
+        <caption class="sr-only">Notification choices</caption>
+        <thead><tr><th>What</th><th>In the app</th><th>By email</th></tr></thead>
+        <tbody>
+        {% for r in rows %}
+          <tr>
+            <td><span class="cell-main">{{ r.label }}</span><span class="cell-sub">{{ r.help }}</span></td>
+            <td data-label="In the app"><div class="check"><input id="app_{{ r.key }}" type="checkbox" name="app_{{ r.key }}" {% if r.in_app %}checked{% endif %} {% if r.locked %}disabled{% endif %}><label for="app_{{ r.key }}"><span class="sr-only">{{ r.label }}: </span>Show in the app</label></div></td>
+            <td data-label="By email"><div class="check"><input id="mail_{{ r.key }}" type="checkbox" name="mail_{{ r.key }}" {% if r.email %}checked{% endif %} {% if r.locked %}disabled{% endif %}><label for="mail_{{ r.key }}"><span class="sr-only">{{ r.label }}: </span>Send by email</label></div></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="panel-foot actions">
+      <button class="btn btn-primary" type="submit">Save preferences</button>
+      <a class="btn btn-quiet" href="/notifications">View my notifications</a>
+    </div>
+  </form>
+</section>
 {% endblock %}

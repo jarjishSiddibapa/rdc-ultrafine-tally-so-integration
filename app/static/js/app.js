@@ -276,6 +276,8 @@
     var n = data.unread || 0;
     badge.textContent = n > 99 ? "99+" : String(n);
     badge.hidden = n === 0;
+    var side = document.querySelector("[data-nav-unread]");     // the same count in the sidebar
+    if (side) { side.textContent = badge.textContent; side.hidden = n === 0; side.setAttribute("aria-label", n + " unread"); }
     bell.querySelector("summary").setAttribute("aria-label", "Notifications" + (n ? ", " + n + " unread" : ""));
     document.title = (n ? "(" + n + ") " : "") + base.replace(/^\(\d+\) /, "");
     list.textContent = "";

@@ -14,6 +14,7 @@
     </div>
   </div>
   <div class="actions">
+    <a class="btn" href="/orders/{{ order.id }}/lifecycle">{{ icon('clock') }}Lifecycle</a>
     {% if can_edit %}
       <a class="btn" href="/orders/{{ order.id }}/edit">{{ icon('edit') }}Edit</a>
       <form method="post" action="/orders/{{ order.id }}/submit">{{ csrf() }}<button class="btn btn-primary" type="submit">{{ icon('send') }}Submit for approval</button></form>

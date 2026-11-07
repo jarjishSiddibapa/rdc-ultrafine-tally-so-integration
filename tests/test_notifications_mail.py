@@ -588,3 +588,70 @@ def test_unused_temporary_password_expires(client, data, db, monkeypatch):
     resp = login(fresh, "fresh.hire@example.com", tmp)
     assert resp.status_code != 303
     assert "expired" in resp.text
+
+
+# ----------------------------------------------------------------------------- navigation and settings area
+def test_sidebar_has_notifications_and_settings_and_no_loose_account_links(client, data):
+    for who in ("sales@example.com", "accounts@example.com", "admin@example.com"):
+        login(client, who)
+        html = client.get("/").text
+        side = html.split('<div class="me">')[0]
+        assert 'href="/notifications"' in side and 'href="/account"' in side
+        me = html.split('<div class="me">')[1].split("</aside>")[0]
+        assert "/account/password" not in me and "/account/notifications" not in me and "Sign out" in me
+    assert "System settings" in html and 'href="/admin/settings"' in html            # admin only, renamed so it is not confused
+
+
+def test_settings_area_has_profile_password_and_notification_tabs(client, data):
+    login(client, "sales@example.com")
+    assert client.get("/account", follow_redirects=False).headers["location"] == "/account/profile"
+    for path, marker in (("/account/profile", "Your profile"), ("/account/password", "Change password"),
+                         ("/account/notifications", "Notification preferences")):
+        r = client.get(path)
+        assert r.status_code == 200 and marker in r.text
+        assert 'aria-label="Settings sections"' in r.text and f'href="{path}" aria-current="page"' in r.text
+    assert "sales@example.com" in client.get("/account/profile").text
+
+
+def test_forced_password_page_is_focused_without_tabs(client, data, db, monkeypatch):
+    login(client, "admin@example.com")
+    r = _create(client)
+    tmp = re.search(r'class="cred"[^>]*>([^<]+)<', r.text).group(1)
+    fresh = client.__class__(client.app, base_url="http://testserver")
+    login(fresh, "fresh.hire@example.com", tmp)
+    page = fresh.get("/account/password")
+    assert "Choose your own password" in page.text and 'aria-label="Settings sections"' not in page.text
+    assert fresh.get("/account/profile", follow_redirects=False).headers["location"] == "/account/password"
+
+
+# ----------------------------------------------------------------------------- order lifecycle
+def test_lifecycle_page_tells_the_whole_story(client, data, db):
+    from app.services import lifecycle
+    oid = _submit(client, data)
+    login(client, "accounts@example.com")
+    post(client, f"/orders/{oid}/reject", {"remarks": "Rate looks wrong"})
+    login(client, "sales@example.com")
+    post(client, f"/orders/{oid}/edit", {**order_form(data), "action": "submit"})
+    login(client, "accounts@example.com")
+    post(client, f"/orders/{oid}/approve")
+    order = db.get(SalesOrder, oid)
+    db.expire_all()
+    lc = lifecycle.build(db, db.get(SalesOrder, oid), db.get(SalesOrder, oid).outbox)
+    titles = [s.title for s in lc.steps]
+    assert titles.index("Submitted for approval") < titles.index("Sent back to sales") < titles.index("Approved")
+    assert titles.count("Submitted for approval") == 2 and "Queued for Tally" in titles
+    assert lc.sent_back == 1 and any(n.startswith("With sales") for n, _, _ in lc.waits)
+    assert any(s.note == "Rate looks wrong" for s in lc.steps)
+    r = client.get(f"/orders/{oid}/lifecycle")
+    assert r.status_code == 200 and "The journey" in r.text and "Rate looks wrong" in r.text and "Where the time went" in r.text
+
+
+def test_lifecycle_is_limited_to_orders_you_may_see_and_has_a_report(client, data, db):
+    oid = _submit(client, data)
+    login(client, "sales2@example.com")
+    assert client.get(f"/orders/{oid}/lifecycle").status_code == 404
+    login(client, "sales@example.com")
+    assert f"/orders/{oid}/lifecycle" in client.get(f"/orders/{oid}").text
+    rep = client.get("/reports/order-lifecycle")
+    assert rep.status_code == 200 and f"/orders/{oid}/lifecycle" in rep.text and "Times sent back" in rep.text
+    assert client.get("/reports/order-lifecycle?export=csv").status_code == 200

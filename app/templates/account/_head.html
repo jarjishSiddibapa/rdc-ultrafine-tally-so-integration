@@ -1,0 +1,9 @@
+{# Shared heading and section tabs for every page under Settings. #}
+{% macro head(active) %}
+<div class="page-head"><div><h1>Settings</h1><p>Your profile, password and notifications.</p></div></div>
+<nav class="tabs settings-tabs" aria-label="Settings sections">
+  <a href="/account/profile" {% if active == 'profile' %}aria-current="page"{% endif %}>Profile</a>
+  <a href="/account/password" {% if active == 'password' %}aria-current="page"{% endif %}>Password</a>
+  <a href="/account/notifications" {% if active == 'notifications' %}aria-current="page"{% endif %}>Notifications{% if nav_unread %}<span class="n" aria-label="{{ nav_unread }} unread">{{ nav_unread }}</span>{% endif %}</a>
+</nav>
+{% endmacro %}

@@ -48,6 +48,10 @@ Sales ledgers (names must match Tally exactly), then create users. Change the se
 - **Forgot password:** `/forgot-password` emails a one-time link (30 minutes, newest link only, stored as a hash). The answer is
   identical for unknown addresses, requests are throttled, the link is built from `APP_BASE_URL` (never from the request),
   and the stored email body is wiped once delivered. Admins can also email a link from **Users**.
+- **Welcome email:** when email is on, **Add user** has a ticked "Email the sign-in details" box. The new person gets an
+  auto-generated temporary password by email (the admin never sees it), must choose their own at first sign-in, and an unused
+  temporary password expires after `TEMP_PASSWORD_HOURS` (default 72). **Resend welcome email** appears on the Users list until
+  they first sign in. The stored mail body is wiped once delivered. With email off, the password is shown to the admin once instead.
 - Set `APP_BASE_URL` to the address your staff really open (for example `http://192.168.1.20:1401`), or emailed links will not work for them.
 
 ## Tally integration

@@ -35,7 +35,7 @@ _TEMPLATE_RE = re.compile(r"^[A-Za-z0-9 .%()/&{}\-]{3,100}$")
 
 def temp_password() -> str:
     """Random, policy-compliant one-time password."""
-    alphabet = string.ascii_letters + string.digits
+    alphabet = "".join(c for c in string.ascii_letters + string.digits if c not in "lIO01o")   # nothing easily misread when typed from an email
     while True:
         pw = "".join(secrets.choice(alphabet) for _ in range(14))
         if any(c.islower() for c in pw) and any(c.isupper() for c in pw) and any(c.isdigit() for c in pw):
@@ -51,7 +51,8 @@ def users_list(request: Request, db: Session = Depends(get_db), ctx: Ctx = Depen
     st, page, download = run_list(request, db, ctx.user, ctx, base, user_spec(), "Users")
     if download:
         return download
-    return render(request, "admin/users.html", {"st": st, "page": page, "show_deleted": request.query_params.get("show_deleted") == "1"})
+    return render(request, "admin/users.html", {"st": st, "page": page, "show_deleted": request.query_params.get("show_deleted") == "1",
+                                                "mail_ok": get_settings().mail_configured})
 
 
 def _plants(db: Session) -> list[Plant]:
@@ -60,7 +61,8 @@ def _plants(db: Session) -> list[Plant]:
 
 def _form_ctx(db: Session, target, values: dict, errors: dict, plant_ids: list[int] | None = None) -> dict:
     chosen = {p.id for p in target.plants} if (target is not None and plant_ids is None) else set(plant_ids or [])
-    return {"target": target, "values": values, "errors": errors, "roles": list(Role), "all_plants": _plants(db), "chosen_plants": chosen}
+    return {"target": target, "values": values, "errors": errors, "roles": list(Role), "all_plants": _plants(db), "chosen_plants": chosen,
+            "mail_ok": get_settings().mail_configured}
 
 
 def _pick_plants(db: Session, plant_ids: list[int]) -> list[Plant]:
@@ -70,7 +72,7 @@ def _pick_plants(db: Session, plant_ids: list[int]) -> list[Plant]:
 
 @router.get("/users/new")
 def user_new(request: Request, db: Session = Depends(get_db)):
-    return render(request, "admin/user_form.html", _form_ctx(db, None, {}, {}))
+    return render(request, "admin/user_form.html", _form_ctx(db, None, {"email_login": "on"}, {}))
 
 
 def _validate_user(db: Session, email: str, name: str, role: str, existing: User | None) -> tuple[dict, dict]:
@@ -95,10 +97,13 @@ def _validate_user(db: Session, email: str, name: str, role: str, existing: User
 
 @router.post("/users/new")
 def user_create(request: Request, email: str = Form("", max_length=254), full_name: str = Form("", max_length=120),
-                role: str = Form(""), plant_ids: list[int] = Form([]), db: Session = Depends(get_db), ctx: Ctx = Depends(get_ctx)):
+                role: str = Form(""), plant_ids: list[int] = Form([]), email_login: str | None = Form(None),
+                db: Session = Depends(get_db), ctx: Ctx = Depends(get_ctx)):
     values, errors = _validate_user(db, email, clean_text(full_name, 120), role, None)
+    values["email_login"] = "on" if email_login == "on" else ""
     if errors:
         return render(request, "admin/user_form.html", _form_ctx(db, None, values, errors, plant_ids), status_code=422)
+    send = email_login == "on" and get_settings().mail_configured
     pw = temp_password()
     user = User(email=values["email"], full_name=values["full_name"], role=Role(role), password_hash="", is_active=True)
     auth_service.set_password(db, user, pw, must_change=True)
@@ -112,9 +117,13 @@ def user_create(request: Request, email: str = Form("", max_length=254), full_na
         return render(request, "admin/user_form.html", _form_ctx(db, None, values, errors, plant_ids), status_code=422)
     audit(db, ctx, "user_created", entity_type="user", entity_id=user.id,
           details={"email": user.email, "role": role, "plants": [p.name for p in user.plants]})
-    notify.account_created(db, user)
+    if send:
+        auth_service.queue_welcome_email(db, user, pw, ctx, by_admin=ctx.user)   # the welcome mail replaces the generic "account ready" notice
+    else:
+        notify.account_created(db, user)
     db.commit()
-    return render(request, "admin/user_credentials.html", {"target": user, "temp_password": pw, "reason": "created"})
+    return render(request, "admin/user_credentials.html", {"target": user, "temp_password": None if send else pw, "reason": "created", "emailed": send,
+                                                         "temp_hours": get_settings().temp_password_hours})
 
 
 def _target(db: Session, user_id: int) -> User:
@@ -174,7 +183,25 @@ def user_reset(user_id: int, request: Request, db: Session = Depends(get_db), ct
     audit(db, ctx, "user_password_reset", entity_type="user", entity_id=u.id)
     notify.password_reset_by_admin(db, u, ctx.user)
     db.commit()
-    return render(request, "admin/user_credentials.html", {"target": u, "temp_password": pw, "reason": "reset"})
+    return render(request, "admin/user_credentials.html", {"target": u, "temp_password": pw, "reason": "reset", "emailed": False,
+                                                         "temp_hours": get_settings().temp_password_hours})
+
+
+@router.post("/users/{user_id}/resend-welcome")
+def user_resend_welcome(user_id: int, db: Session = Depends(get_db), ctx: Ctx = Depends(get_ctx)):
+    """Issue a fresh temporary password and email it. For people who have not signed in yet (lost or expired mail)."""
+    u = _target(db, user_id)
+    if not u.can_sign_in or not get_settings().mail_configured:
+        return redirect("/admin/users", "That account is disabled, or email is not set up.", "error")
+    pw = temp_password()
+    if not auth_service.queue_welcome_email(db, u, pw, ctx, by_admin=ctx.user, resend=True):
+        db.rollback()
+        return redirect("/admin/users", f"A welcome email was already sent to {u.email} less than a minute ago.", "info")
+    auth_service.set_password(db, u, pw, must_change=True)
+    auth_service.revoke_all_sessions(db, u.id)
+    audit(db, ctx, "user_password_reset", entity_type="user", entity_id=u.id, details={"emailed": True})
+    db.commit()
+    return redirect("/admin/users", f"A new temporary password is on its way to {u.email}. The old one no longer works.")
 
 
 @router.post("/users/{user_id}/send-reset-link")

@@ -28,6 +28,7 @@ log = logging.getLogger("app.mail")
 MAX_ATTEMPTS = 6
 STALE_LOCK = timedelta(minutes=10)
 SENSITIVE_MAX_AGE = timedelta(hours=1)   # a reset link that could not be sent within an hour is useless
+SENSITIVE_MAX_AGE_BY_KIND = {"welcome": timedelta(hours=24)}   # a temporary password outlives a 30-minute link
 _CTRL = re.compile(r"[\x00-\x1f\x7f]+")
 _ADDR = re.compile(r"^[^@\s,;<>\"']+@[^@\s,;<>\"']+\.[^@\s,;<>\"']+$")
 
@@ -199,8 +200,8 @@ def deliver_pending(db: Session, transport: Transport | None = None, limit: int 
     for row_id in [r.id for r in rows]:
         row = db.get(QueuedEmail, row_id)
         row.locked_at = None
-        if row.sensitive and utcnow() - row.created_at > SENSITIVE_MAX_AGE:
-            _finish_dead(row, "Not sent: the link expired before the mail server accepted it.")
+        if row.sensitive and utcnow() - row.created_at > SENSITIVE_MAX_AGE_BY_KIND.get(row.kind, SENSITIVE_MAX_AGE):
+            _finish_dead(row, "Not sent: the secret in it expired before the mail server accepted it.")
             db.commit()
             continue
         row.attempts += 1

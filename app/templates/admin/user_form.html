@@ -3,7 +3,7 @@
 {% block title %}{{ 'Edit user' if target else 'Add user' }} · {{ app_name }}{% endblock %}
 {% block content %}
 <div class="page-head"><h1>{{ 'Edit ' ~ target.full_name if target else 'Add user' }}</h1>
-  {% if not target %}<p>A one-time password is created for the new user and shown once.</p>{% endif %}</div>
+  {% if not target %}<p>A one-time password is created for the new user. {{ 'It can be emailed to them, or shown to you once.' if mail_ok else 'It is shown to you once (email is not set up).' }}</p>{% endif %}</div>
 {% if errors %}<div class="notice notice-error" role="alert">{{ errors.get('_') or 'Fix the highlighted fields and save again.' }}</div>{% endif %}
 <form method="post" action="{{ '/admin/users/' ~ target.id if target else '/admin/users/new' }}" class="panel stack-s" novalidate>
   {{ csrf() }}
@@ -34,6 +34,11 @@
   </fieldset>
   {% if target %}
   <div class="check"><input id="is_active" type="checkbox" name="is_active" {% if target.is_active %}checked{% endif %}><label for="is_active">Account is active</label></div>
+  {% elif mail_ok %}
+  <div class="stack-xs">
+    <div class="check"><input id="email_login" type="checkbox" name="email_login" {% if values.get('email_login') %}checked{% endif %} aria-describedby="email-login-hint"><label for="email_login">Email the sign-in details to the new user</label></div>
+    <span class="hint" id="email-login-hint">A welcome email with an auto-generated temporary password goes to the address above. You will not see the password. They must choose their own at first sign-in.</span>
+  </div>
   {% endif %}
   <div class="actions">
     <button class="btn btn-primary" type="submit">{{ 'Save changes' if target else 'Create user' }}</button>

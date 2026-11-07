@@ -503,3 +503,88 @@ def test_old_read_notifications_are_purged_but_unread_are_kept(client, data, db)
     db.commit()
     assert notify.purge_old(db) == 1
 
+
+
+# ----------------------------------------------------------------------------- welcome email with temporary password
+def _mail_on(monkeypatch, on=True):
+    from app.core.config import Settings
+    monkeypatch.setattr(Settings, "mail_configured", property(lambda self: on))
+
+
+def _create(client, email="fresh.hire@example.com", **extra):
+    return post(client, "/admin/users/new", {"email": email, "full_name": "Fresh Hire", "role": "accounts", **extra})
+
+
+def _temp_from_mail(db, email):
+    m = _mails(db, email, "welcome")[-1]
+    return re.search(r"Temporary password: (\S+)", m.text_body).group(1)
+
+
+def test_welcome_email_carries_temp_password_and_forces_a_change(client, data, db, monkeypatch):
+    _mail_on(monkeypatch)
+    login(client, "admin@example.com")
+    r = _create(client, email_login="on")
+    assert r.status_code == 200 and 'class="cred"' not in r.text                    # the admin never sees it
+    assert not _mails(db, "fresh.hire@example.com", "account_created")              # welcome mail replaces the generic notice
+    m = _mails(db, "fresh.hire@example.com", "welcome")
+    assert len(m) == 1 and m[0].sensitive and "Welcome to" in m[0].html_body
+    tmp = _temp_from_mail(db, "fresh.hire@example.com")
+    assert re.fullmatch(r"[A-Za-z0-9]{14}", tmp) and not set(tmp) & set("lIO01o")
+    assert tmp not in "".join(a.details if isinstance(a.details, str) else str(a.details) for a in db.execute(select(AuditLog)).scalars())
+
+    sink = Sink()
+    assert emailing.deliver_pending(db, sink) >= 1
+    db.expire_all()
+    row = db.get(QueuedEmail, m[0].id)
+    assert row.status is EmailStatus.SENT and row.text_body is None and row.html_body is None   # password not kept
+
+    fresh = client.__class__(client.app, base_url="http://testserver")
+    resp = login(fresh, "fresh.hire@example.com", tmp)
+    assert resp.status_code == 303 and resp.headers["location"] == "/account/password"
+    assert fresh.get("/orders", follow_redirects=False).headers["location"] == "/account/password"
+    ok = post(fresh, "/account/password", {"current": tmp, "new_password": NEW_PASSWORD, "confirm": NEW_PASSWORD})
+    assert ok.status_code == 303 and fresh.get("/orders", follow_redirects=False).status_code == 200
+
+
+def test_new_user_form_falls_back_to_on_screen_password(client, data, db, monkeypatch):
+    login(client, "admin@example.com")
+    _mail_on(monkeypatch, False)
+    r = _create(client, email_login="on")                                           # ticked, but email is not set up
+    assert 'class="cred"' in r.text and not _mails(db, "fresh.hire@example.com", "welcome")
+    _mail_on(monkeypatch)
+    r = _create(client, email="other.hire@example.com")                             # mail is on, box not ticked
+    assert 'class="cred"' in r.text and not _mails(db, "other.hire@example.com", "welcome")
+    form = client.get("/admin/users/new").text
+    assert 'name="email_login"' in form and "checked" in form.split('name="email_login"')[1][:40]
+
+
+def test_resend_welcome_issues_a_new_password_once_a_minute(client, data, db, monkeypatch):
+    _mail_on(monkeypatch)
+    login(client, "admin@example.com")
+    _create(client, email_login="on")
+    first = _temp_from_mail(db, "fresh.hire@example.com")
+    uid = db.execute(select(QueuedEmail.user_id).where(QueuedEmail.to_email == "fresh.hire@example.com")).scalars().first()
+    assert post(client, f"/admin/users/{uid}/resend-welcome").status_code == 303
+    assert len(_mails(db, "fresh.hire@example.com", "welcome")) == 1                # inside the cool-down: refused
+    for m in _mails(db, "fresh.hire@example.com", "welcome"):
+        m.created_at = utcnow() - timedelta(minutes=5)
+    db.commit()
+    post(client, f"/admin/users/{uid}/resend-welcome")
+    second = _temp_from_mail(db, "fresh.hire@example.com")
+    assert len(_mails(db, "fresh.hire@example.com", "welcome")) == 2 and second != first
+    assert login(client.__class__(client.app, base_url="http://testserver"), "fresh.hire@example.com", first).status_code != 303
+    assert login(client.__class__(client.app, base_url="http://testserver"), "fresh.hire@example.com", second).status_code == 303
+
+
+def test_unused_temporary_password_expires(client, data, db, monkeypatch):
+    login(client, "admin@example.com")
+    r = _create(client)
+    tmp = re.search(r'class="cred"[^>]*>([^<]+)<', r.text).group(1)
+    from app.models import User
+    u = db.execute(select(User).where(User.email == "fresh.hire@example.com")).scalar_one()
+    u.password_changed_at = utcnow() - timedelta(hours=73)
+    db.commit()
+    fresh = client.__class__(client.app, base_url="http://testserver")
+    resp = login(fresh, "fresh.hire@example.com", tmp)
+    assert resp.status_code != 303
+    assert "expired" in resp.text

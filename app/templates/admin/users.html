@@ -27,6 +27,7 @@
     <form method="post" action="/admin/users/{{ u.id }}/unlock">{{ csrf() }}<button class="btn btn-small" type="submit">Unlock</button></form>
     {% endif %}
     {% if u.is_active %}<form method="post" action="/admin/users/{{ u.id }}/send-reset-link">{{ csrf() }}<button class="btn btn-small" type="submit" data-confirm="Email {{ u.full_name }} a one-time link to choose a new password?" data-confirm-label="Send link">Email reset link</button></form>{% endif %}
+    {% if mail_ok and u.is_active and u.must_change_password and not u.last_login_at %}<form method="post" action="/admin/users/{{ u.id }}/resend-welcome">{{ csrf() }}<button class="btn btn-small" type="submit" data-confirm="Create a new temporary password for {{ u.full_name }} and email it to {{ u.email }}? The old one stops working." data-confirm-label="Resend">Resend welcome email</button></form>{% endif %}
     <form method="post" action="/admin/users/{{ u.id }}/reset-password">{{ csrf() }}<button class="btn btn-small" type="submit" data-confirm="Create a new temporary password for {{ u.full_name }}? Their current password stops working and they are signed out everywhere." data-confirm-label="Reset password">Reset password</button></form>
     {% if u.id != user.id %}
     <form method="post" action="/admin/users/{{ u.id }}/delete">{{ csrf() }}<button class="btn btn-small btn-danger" type="submit" data-confirm="Remove {{ u.full_name }}? They can no longer sign in. Their past work stays in the records." data-confirm-label="Remove user">Remove</button></form>

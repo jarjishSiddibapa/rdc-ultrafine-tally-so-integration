@@ -17,7 +17,7 @@ from app.core.security import (
     password_problems,
     verify_password,
 )
-from app.models import PasswordReset, User, UserSession
+from app.models import PasswordReset, QueuedEmail, User, UserSession
 from app.models.base import utcnow
 from app.services import emailing, notify
 from app.services.audit import Ctx, audit
@@ -75,6 +75,12 @@ def authenticate(db: Session, email: str, password: str, ctx: Ctx) -> tuple[User
             notify.account_locked(db, user, s.lockout_minutes, now.strftime("%Y%m%d%H%M"))
         db.commit()
         raise AuthError(GENERIC_FAIL)
+
+    if user.must_change_password and user.password_changed_at and now - user.password_changed_at > timedelta(hours=s.temp_password_hours):
+        # Right password, but a temporary one that sat unused too long (it may be sitting in an inbox).
+        audit(db, ctx, "login_failed", entity_type="user", entity_id=user.id, details={"reason": "temp_password_expired"}, actor_email=user.email)
+        db.commit()
+        raise AuthError("Your temporary password has expired. Ask your administrator to send a new one, or use 'Forgot your password?'.")
 
     if needs_rehash(user.password_hash):
         user.password_hash = hash_password(password)
@@ -215,6 +221,36 @@ def request_password_reset(db: Session, user: User, ctx: Ctx, *, by_admin: User 
                          requested_by_id=by_admin.id if by_admin else None)
     audit(db, ctx, "password_reset_requested", entity_type="user", entity_id=user.id,
           details={"by_admin": by_admin.email if by_admin else None, "expires_minutes": s.reset_token_minutes}, actor_email=user.email)
+    return True
+
+
+def queue_welcome_email(db: Session, user: User, password: str, ctx: Ctx, *, by_admin: User | None, resend: bool = False) -> bool:
+    """Email the person their temporary password and sign-in link. Returns False if one went out within the last minute.
+
+    The message body is wiped as soon as it is delivered (see emailing.deliver_pending); the password only
+    ever lives hashed in the users table after that. The person must choose their own password at first sign-in.
+    """
+    s = get_settings()
+    cutoff = utcnow() - RESET_COOLDOWN
+    recent = db.execute(select(func.count()).select_from(QueuedEmail).where(
+        QueuedEmail.user_id == user.id, QueuedEmail.kind == "welcome", QueuedEmail.created_at > cutoff)).scalar_one()
+    if recent:
+        return False
+    html, text = emailing.compose(
+        f"Welcome to {s.app_name}" if not resend else "Your new temporary password",
+        ([f"An account was created for you by {by_admin.full_name if by_admin else 'your administrator'}."] if not resend
+         else [f"{by_admin.full_name if by_admin else 'Your administrator'} issued you a new temporary password."])
+        + ["Sign in with the details below. You will be asked to choose your own password straight away."],
+        greeting=f"Hi {(user.full_name or 'there').split()[0]},",
+        details=[("Email", user.email), ("Role", user.role.label), ("Temporary password", password)],
+        button=("Sign in", emailing.abs_url("/login")),
+        footnote=f"The temporary password stops working after {s.temp_password_hours} hours and can be used only to set your own. "
+                 "Do not share it, and delete this email once you have signed in.")
+    emailing.queue_email(db, to_email=user.email, to_name=user.full_name,
+                         subject=f"[{s.app_name}] " + ("Your account is ready" if not resend else "Your new temporary password"),
+                         html=html, text=text, kind="welcome", user_id=user.id, sensitive=True,
+                         requested_by_id=by_admin.id if by_admin else None)
+    audit(db, ctx, "welcome_email_queued", entity_type="user", entity_id=user.id, details={"resend": resend, "to": user.email})
     return True
 
 

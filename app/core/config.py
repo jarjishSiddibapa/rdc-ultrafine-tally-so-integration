@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     mail_from_name: str = "Ultrafine Sales Orders"
     app_base_url: str = "http://localhost:1401"   # used for links inside emails; never taken from the request
     reset_token_minutes: int = 30
+    temp_password_hours: int = 72                 # an unused temporary (admin-issued) password stops working after this long
     pending_reminder_hours: int = 24              # remind approvers about orders waiting longer than this
 
     # Session / auth policy

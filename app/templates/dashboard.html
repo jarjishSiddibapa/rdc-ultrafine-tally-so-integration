@@ -104,7 +104,7 @@
         <div class="panel-head"><h2 id="setup-h">Get set up</h2></div>
         <ul class="todo">
           {% for s in setup %}
-          <li class="{{ 'done' if s.done }}"><span class="tick">{{ icon('check', 'i-s') }}</span><span>{{ s.label }}</span>{% if not s.done %}<a href="{{ s.href }}">Do it</a>{% endif %}</li>
+          <li class="{{ 'done' if s.done }}"><span class="tick">{{ icon('check', 'i-s') }}</span><span>{{ s.label }}</span>{% if not s.done %}<a href="{{ s.href }}">Set up</a>{% endif %}</li>
           {% endfor %}
         </ul>
       </section>

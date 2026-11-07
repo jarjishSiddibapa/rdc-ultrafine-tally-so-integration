@@ -4,11 +4,11 @@
 {% block title %}{{ 'Approvals' if user.role == Role.ACCOUNTS else 'Orders' }} · {{ app_name }}{% endblock %}
 
 {% macro order_cell(c, r) %}
-  {%- if c.key == 'so_number' -%}<a class="link-strong" href="/orders/{{ r.id }}">{{ r.so_number or ('Draft #' ~ r.id) }}</a><span class="cell-sub">{{ r.so_type.short }}</span>
+  {%- if c.key == 'so_number' -%}<a class="link-strong" href="/orders/{{ r.id }}">{{ r.so_number or ('Draft #' ~ r.id) }}</a><span class="cell-sub">{{ r.so_type.short }}{% if user.role != Role.SALES %} &middot; {{ r.created_by.full_name }}{% endif %}</span>
   {%- elif c.key == 'party_name' -%}<span class="cell-main">{{ r.party_name }}</span><span class="cell-sub">PO {{ r.customer_po_number }}</span>
   {%- elif c.key == 'total_amount' -%}<b>{{ r.total_amount|inr }}</b>
   {%- elif c.key == 'status' -%}{{ status_badge(r) }}
-  {%- elif c.key == 'tally_status' -%}{{ tally_badge(r) }}
+  {%- elif c.key == 'tally_status' -%}{{ tally_badge(r, dash=True) }}
   {%- elif c.key == 'created_by' -%}<span class="who"><span class="avatar avatar-s" aria-hidden="true">{{ initials(r.created_by.full_name) }}</span>{{ r.created_by.full_name }}</span>
   {%- else -%}{{ cell(c, r) }}{%- endif -%}
 {% endmacro %}

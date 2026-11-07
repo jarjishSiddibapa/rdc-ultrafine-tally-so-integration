@@ -3,9 +3,9 @@
 {% block title %}Audit log · {{ app_name }}{% endblock %}
 
 {% macro audit_cell(c, r) %}
-  {%- if c.key == 'record' -%}{% if r.entity_type == 'sales_order' and r.entity_id %}<a href="/orders/{{ r.entity_id }}">Order {{ r.entity_id }}</a>{% elif r.entity_type %}{{ r.entity_type|replace('_', ' ') }} {{ r.entity_id or '' }}{% endif %}
-  {%- elif c.key == 'details' -%}<span class="small mono">{% if r.details %}{% for k, v in r.details.items() %}{{ k }}: {{ v }}{% if not loop.last %}; {% endif %}{% endfor %}{% endif %}</span>
-  {%- elif c.key in ('ip_address', 'request_id') -%}<span class="mono">{{ c.raw(r) or '' }}</span>
+  {%- if c.key == 'record' -%}{% if r.entity_type == 'sales_order' and r.entity_id %}<a class="nowrap" href="/orders/{{ r.entity_id }}">Order {{ r.entity_id }}</a>{% elif r.entity_type %}{{ r.entity_type|replace('_', ' ') }} {{ r.entity_id or '' }}{% endif %}
+  {%- elif c.key == 'details' -%}<span class="small muted">{{ c.raw(r) }}</span>
+  {%- elif c.key in ('ip_address', 'request_id') -%}<span class="small">{{ c.raw(r) or '' }}</span>
   {%- else -%}{{ cell(c, r) }}{%- endif -%}
 {% endmacro %}
 

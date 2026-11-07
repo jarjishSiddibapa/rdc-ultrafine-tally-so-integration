@@ -82,17 +82,17 @@
 </div>
 {% endmacro %}
 
-{% macro status_badge(order) %}
-{% set s = order.status.value %}
+{% macro status_badge(order) -%}
+{%- set s = order.status.value -%}
 <span class="badge {{ {'draft':'', 'pending_approval':'badge-warn', 'rejected':'badge-bad', 'approved':'badge-ok'}[s] }}">{{ order.status.label }}</span>
-{% endmacro %}
+{%- endmacro %}
 
-{% macro tally_badge(order) %}
-{% if order.status.value == 'approved' %}
-{% set s = order.tally_status.value %}
+{% macro tally_badge(order, dash=False) -%}
+{%- if order.status.value == 'approved' -%}
+{%- set s = order.tally_status.value -%}
 <span class="badge {{ {'not_queued':'', 'queued':'badge-accent', 'synced':'badge-ok', 'failed':'badge-bad'}[s] }}">{{ order.tally_status.label }}</span>
-{% else %}<span class="faint">Not applicable</span>{% endif %}
-{% endmacro %}
+{%- elif dash -%}<span class="faint" title="Not applicable until the order is approved">&mdash;</span>{%- else -%}<span class="faint">Not applicable</span>{%- endif -%}
+{%- endmacro %}
 
 {% macro empty_art() %}
 <svg class="art" viewBox="0 0 96 96" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

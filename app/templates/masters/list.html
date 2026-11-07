@@ -27,7 +27,7 @@
   <a class="btn btn-primary" href="/masters/{{ k.slug }}/new">{{ icon('plus') }}Add {{ k.singular }}</a>
 </div>
 
-{% call toolbar(st, page, k.title|lower, 'Search by name, GSTIN, city...', own=['show_deleted']) %}
+{% call toolbar(st, page, k.title|lower, 'Search by name, GSTIN, city...', own=['show_deleted'], inline_caller=True) %}
 <div class="check"><input id="sd" type="checkbox" name="show_deleted" value="1" {% if show_deleted %}checked{% endif %}><label for="sd">Include removed {{ k.title|lower }}</label></div>
 {% endcall %}
 

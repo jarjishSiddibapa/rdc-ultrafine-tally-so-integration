@@ -482,7 +482,9 @@ dialog form { display: grid; gap: var(--space-m); }
 .more .n { font-size: 0.75rem; font-weight: 700; padding: 1px 8px; border-radius: 10px; background: var(--color-accent); color: var(--color-accent-ink); }
 .more > .filter-grid, .more > .col-grid { padding: var(--space-xs) var(--space-m) var(--space-m); }
 .more > .actions { padding: 0 var(--space-m) var(--space-m); }
-.filter-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-s); }
+.filter-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: var(--space-s) var(--space-m); align-items: end; }
+.filter-grid .span-2 { grid-column: span 2; }
+@media (max-width: 560px) { .filter-grid .span-2 { grid-column: auto; } }
 .col-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); column-gap: var(--space-m); }
 .range { display: grid; grid-template-columns: 1fr auto 1fr; gap: var(--space-xs); align-items: center; }
 .fchips { list-style: none; display: flex; flex-wrap: wrap; gap: var(--space-xs); margin: 0 0 var(--space-m); padding: 0; }
@@ -609,3 +611,80 @@ tfoot .totals-row td:first-child { white-space: nowrap; }
 .waits dd { margin: 0; font-weight: 700; text-align: right; }
 .waits-total { border-top: 1px solid var(--color-hairline); padding-top: var(--space-s); }
 .waits-total dt { color: var(--color-ink); font-weight: 600; }
+
+/* ------------------------------------------------------------------ list toolbar (v2) */
+.only-phone { display: none; }
+@media (max-width: 640px) { .only-phone { display: block; } }
+.listbar-row .actions { display: flex; flex-wrap: wrap; gap: var(--space-xs); align-items: center; }
+.n-soft { margin-left: 8px; font-size: 0.75rem; font-weight: 700; color: var(--color-ink-soft); font-variant-numeric: tabular-nums; }
+.menu-cols { width: min(460px, calc(100vw - 32px)); max-height: min(70vh, 520px); overflow: auto; padding: var(--space-s) var(--space-m) 0; gap: 0; }
+.menu-cols .col-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--space-m); padding: 0; }
+.menu-foot { position: sticky; bottom: 0; display: flex; gap: var(--space-xs); padding: var(--space-s) 0; margin-top: var(--space-xs); background: var(--color-surface); border-top: 1px solid var(--color-hairline); }
+@media (max-width: 480px) { .menu-cols .col-grid { grid-template-columns: 1fr; } }
+.more-inner { margin: var(--space-xs) var(--space-m) 0; border-top: 1px solid var(--color-hairline); }
+.more-inner > summary { display: flex; align-items: center; gap: var(--space-xs); min-height: 44px; cursor: pointer; font-weight: 600; font-size: var(--text-s); color: var(--color-ink-soft); list-style: none; }
+.more-inner > summary::-webkit-details-marker { display: none; }
+.more-inner > summary::before { content: "B8"; color: var(--color-ink-faint); transition: transform var(--dur-micro) var(--ease-out); }
+.more-inner[open] > summary::before { transform: rotate(90deg); }
+.more-inner > .filter-grid { padding: var(--space-xs) 0 var(--space-m); }
+.filter-actions { padding-top: var(--space-xs); }
+.pager-size { display: flex; align-items: center; gap: var(--space-2xs); }
+.chip-n { display: inline-grid; place-items: center; min-width: 34px; min-height: 34px; padding: 0 8px; border-radius: 8px; font-size: 0.8125rem; font-weight: 600; font-variant-numeric: tabular-nums; text-decoration: none; color: var(--color-ink-soft); border: 1px solid transparent; }
+a.chip-n:hover { border-color: var(--color-hairline); color: var(--color-ink); background: var(--color-surface); }
+.chip-n.on { background: var(--color-accent-wash); color: var(--color-accent); }
+
+/* ------------------------------------------------------------------ polish pass */
+.nowrap, .who, td.num, td .badge { white-space: nowrap; }
+td.txt { min-width: 11rem; }
+th, td { padding: 12px 12px; }
+th:first-child, td:first-child { padding-left: var(--space-m); }
+th:last-child, td:last-child { padding-right: var(--space-m); }
+td .cell-sub { white-space: nowrap; }
+.form-narrow { max-width: 760px; }
+.stack.form-narrow > .panel { max-width: none; }
+.inline-check { min-width: 0; flex: 0 0 auto; align-self: center; }
+.inline-check .check { min-height: 44px; }
+.row-actions { display: flex; flex-wrap: nowrap; gap: var(--space-xs); justify-content: flex-end; align-items: center; }
+.row-actions form { display: inline; }
+.row-menu .menu-list { min-width: 260px; right: 0; left: auto; z-index: 40; }
+.row-menu .caret { margin-left: 6px; font-size: 0.7em; }
+.menu-list button { display: block; width: 100%; text-align: left; padding: 11px 12px; border: 0; border-radius: 6px; background: transparent; color: var(--color-ink); font: inherit; font-weight: 600; cursor: pointer; }
+.menu-list button:hover { background: var(--color-accent-wash); }
+.menu-list button.danger { color: var(--color-bad); }
+.menu-list button.danger:hover { background: oklch(from var(--color-bad) l c h / 0.1); }
+.menu-list form { display: block; }
+.table-wrap:has(.row-menu[open]) { overflow: visible; }
+::selection { background: var(--color-accent-wash); color: var(--color-ink); }
+html { caret-color: var(--color-accent); scrollbar-color: var(--color-ink-faint) transparent; }
+@media (max-width: 640px) {
+  .listbar-row .only-phone { flex: 1 1 calc(50% - var(--space-xs)); min-width: 0; }
+  .listbar-row .actions { width: 100%; }
+  .listbar-row .actions > .btn-primary { flex: 1 1 auto; }
+  .row-actions { flex-wrap: wrap; justify-content: flex-start; }
+  tfoot .totals-row td.cell-empty { display: none; }
+}
+.panel.flush:has(.row-menu[open]) { overflow: visible; }
+.todo a { font-weight: 600; }
+
+td:not(.txt) { white-space: nowrap; }
+@media (max-width: 640px) { td:not(.txt) { white-space: normal; } }
+
+@media (max-width: 640px) {
+  .listbar-row .actions > .btn-primary { flex: 1 1 100%; }
+  .listbar-row .actions > .menu { flex: 1 1 calc(50% - var(--space-xs)); }
+  .listbar-row .actions > .menu > summary { width: 100%; justify-content: center; }
+  tfoot, tfoot tr { display: block; width: 100%; }
+}
+/* Rows animate in with a transform, so each row is its own stacking layer: lift the row whose menu is open above the rows after it. */
+tr:has(.row-menu[open]) { position: relative; z-index: 20; }
+.panel.flush:has(.row-menu[open]) { position: relative; z-index: 20; }
+/* Short laptop screens: tighter menu so every item and the user card fit without scrolling. */
+@media (min-width: 961px) and (max-height: 840px) {
+  .side { gap: var(--space-s); padding-block: var(--space-s); }
+  .nav a { min-height: 38px; }
+  .nav-group { margin-top: var(--space-s); }
+  .me { padding-top: var(--space-s); gap: var(--space-xs); }
+}
+
+td.ch { white-space: normal; }
+td.ch .badge, td.ch .who { white-space: nowrap; }

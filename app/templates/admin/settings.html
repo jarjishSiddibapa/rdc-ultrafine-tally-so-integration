@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% from "_macros.html" import csrf, field with context %}
-{% block title %}Settings · {{ app_name }}{% endblock %}
+{% block title %}System settings · {{ app_name }}{% endblock %}
 {% block content %}
-<div class="page-head"><div><h1>Settings</h1><p>How the tax ledgers are named when orders go to Tally. The tax itself (CGST + SGST or IGST) follows the plant's state, set under Master data &gt; Plants.</p></div></div>
+<div class="page-head"><div><h1>System settings</h1><p>How the tax ledgers are named when orders go to Tally. The tax itself (CGST + SGST or IGST) follows the plant's state, set under Master data &gt; Plants.</p></div></div>
 {% if errors %}<div class="notice notice-error" role="alert">Fix the highlighted fields and save again.</div>{% endif %}
-<form method="post" action="/admin/settings" class="stack" novalidate>
+<form method="post" action="/admin/settings" class="stack form-narrow" novalidate>
   {{ csrf() }}
   <section class="panel" aria-labelledby="co-h">
     <h2 id="co-h">Company</h2>

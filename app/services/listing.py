@@ -51,6 +51,7 @@ class Col:
     total: bool = False                    # add up across every matching row
     value: Callable[[Any], Any] | None = None        # row -> display / export value
     hint: str = ""
+    quick: bool = False                    # shown up front in the filter panel (the rest sit under More filters)
 
     @property
     def is_num(self) -> bool:

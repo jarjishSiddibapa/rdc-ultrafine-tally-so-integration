@@ -2,10 +2,10 @@
 {% from "_macros.html" import csrf, field with context %}
 {% block title %}{{ 'Edit user' if target else 'Add user' }} · {{ app_name }}{% endblock %}
 {% block content %}
-<div class="page-head"><h1>{{ 'Edit ' ~ target.full_name if target else 'Add user' }}</h1>
-  {% if not target %}<p>A one-time password is created for the new user. {{ 'It can be emailed to them, or shown to you once.' if mail_ok else 'It is shown to you once (email is not set up).' }}</p>{% endif %}</div>
+<div class="page-head"><div><h1>{{ 'Edit ' ~ target.full_name if target else 'Add user' }}</h1>
+  {% if not target %}<p>A one-time password is created for the new user. {{ 'It can be emailed to them, or shown to you once.' if mail_ok else 'It is shown to you once (email is not set up).' }}</p>{% endif %}</div></div>
 {% if errors %}<div class="notice notice-error" role="alert">{{ errors.get('_') or 'Fix the highlighted fields and save again.' }}</div>{% endif %}
-<form method="post" action="{{ '/admin/users/' ~ target.id if target else '/admin/users/new' }}" class="panel stack-s" novalidate>
+<form method="post" action="{{ '/admin/users/' ~ target.id if target else '/admin/users/new' }}" class="panel stack-s form-narrow" novalidate>
   {{ csrf() }}
   <div class="form-grid">
     {% if target %}

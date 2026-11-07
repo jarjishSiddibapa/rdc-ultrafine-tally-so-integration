@@ -6,7 +6,7 @@
 {% macro q_cell(c, r) %}
   {%- if c.key == 'so_number' -%}<a class="link-strong" href="/orders/{{ r.order_id }}">{{ r.order.so_number }}</a>
   {%- elif c.key == 'total_amount' -%}{{ r.order.total_amount|inr }}
-  {%- elif c.key == 'status' -%}<span class="badge {{ {'pending':'badge-accent','in_progress':'badge-accent','sent':'badge-ok','failed':'badge-warn','dead':'badge-bad'}[r.status.value] }}">{{ r.status.value|replace('_', ' ')|capitalize }}</span>
+  {%- elif c.key == 'status' -%}<span class="badge {{ {'pending':'badge-warn','in_progress':'badge-accent','sent':'badge-ok','failed':'badge-bad','dead':'badge-bad'}[r.status.value] }}">{{ r.status.value|replace('_', ' ')|capitalize }}</span>
   {%- elif c.key == 'last_error' -%}<span class="small">{{ r.last_error or '' }}</span>
   {%- else -%}{{ cell(c, r) }}{%- endif -%}
 {% endmacro %}

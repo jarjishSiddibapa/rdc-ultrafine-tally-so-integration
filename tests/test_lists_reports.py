@@ -177,7 +177,7 @@ def test_masters_users_audit_tally_lists_filter_sort_and_export(client, data):
     assert "Active" in client.get("/admin/users?f_status=active").text
     assert "Anil Accounts" in client.get("/admin/users?q=anil").text
     audit = client.get("/admin/audit?f_action=so_approved").text
-    assert "so approved" in audit and "so submitted" not in audit.split("<tbody>")[1]
+    assert "Order approved" in audit and "Order submitted" not in audit.split("<tbody>")[1]
     # the queue shows when each order was queued; sorting by each timestamp works
     for key in ("created_at", "last_attempt_at", "sent_at", "push_time", "attempts"):
         assert client.get(f"/admin/tally?sort={key}&dir=desc").status_code == 200, key

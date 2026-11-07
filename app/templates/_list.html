@@ -6,6 +6,7 @@
 {%- set v = c.raw(r) -%}
 {%- if v is none or v == '' -%}
 {%- elif v.label is defined -%}{{ v.label }}
+{%- elif v == 'Not applicable' -%}<span class="faint" title="Not applicable">&mdash;</span>
 {%- elif c.kind == 'date' -%}{{ v|date }}
 {%- elif c.kind == 'datetime' -%}<span class="dt">{{ v|dt('%d %b %Y') }}</span><span class="cell-sub">{{ v|dt('%I:%M:%S %p') }}</span>
 {%- elif c.kind == 'money' -%}{{ v|inr }}
@@ -28,31 +29,69 @@
 </th>
 {% endmacro %}
 
-{% macro toolbar(state, page, noun='records', placeholder='Search', own=[], download=True, download_label='Download') %}
+{% macro filter_field(c, state) %}
+{% set n = 'f_' ~ c.key %}
+<div class="field {{ 'span-2' if c.kind in ('date', 'datetime') }}">
+  {% if c.kind in ('date', 'datetime', 'number', 'money', 'qty', 'duration') %}
+  <span class="label" id="lbl-{{ n }}">{{ c.label }}{% if c.kind == 'duration' %} <span class="faint">(seconds)</span>{% endif %}</span>
+  <div class="range" role="group" aria-labelledby="lbl-{{ n }}">
+    <input name="{{ n }}_from" aria-label="{{ c.label }} from" type="{{ 'date' if c.kind in ('date', 'datetime') else 'text' }}" {% if c.kind not in ('date', 'datetime') %}inputmode="decimal" placeholder="Min"{% endif %} value="{{ state.raw.get(n ~ '_from', '') }}">
+    <span class="faint" aria-hidden="true">to</span>
+    <input name="{{ n }}_to" aria-label="{{ c.label }} to" type="{{ 'date' if c.kind in ('date', 'datetime') else 'text' }}" {% if c.kind not in ('date', 'datetime') %}inputmode="decimal" placeholder="Max"{% endif %} value="{{ state.raw.get(n ~ '_to', '') }}">
+  </div>
+  {% elif c.kind == 'choice' %}
+  <label for="{{ n }}">{{ c.label }}</label>
+  <select id="{{ n }}" name="{{ n }}"><option value="{{ 'all' if c.key in state.spec.defaults else '' }}">Any</option>{% for v, lbl in c.choices %}<option value="{{ v }}" {% if state.raw.get(n) == v %}selected{% endif %}>{{ lbl }}</option>{% endfor %}</select>
+  {% elif c.kind == 'bool' %}
+  <label for="{{ n }}">{{ c.label }}</label>
+  <select id="{{ n }}" name="{{ n }}"><option value="">Any</option><option value="1" {% if state.raw.get(n) == '1' %}selected{% endif %}>Yes</option><option value="0" {% if state.raw.get(n) == '0' %}selected{% endif %}>No</option></select>
+  {% else %}
+  <label for="{{ n }}">{{ c.label }}</label>
+  <input id="{{ n }}" name="{{ n }}" type="text" maxlength="80" value="{{ state.raw.get(n, '') }}" autocomplete="off" placeholder="Contains...">
+  {% endif %}
+</div>
+{% endmacro %}
+
+{# Filters: a short everyday set up front, the long tail under "More filters". Sorting is by clicking a column heading. #}
+{% macro toolbar(state, page, noun='records', placeholder='Search', own=[], download=True, download_label='Download', inline_caller=False) %}
+{% set fcols = state.spec.cols|selectattr('can_filter')|list %}
+{% if fcols|length > 8 %}{% set quick = fcols|selectattr('quick')|list %}{% if not quick %}{% set quick = fcols[:6] %}{% endif %}{% else %}{% set quick = fcols %}{% endif %}
+{% set rest = fcols|reject('in', quick)|list %}
+{% set ns = namespace(rest_active=false) %}
+{% for c in rest %}{% if state.raw.get('f_' ~ c.key) or state.raw.get('f_' ~ c.key ~ '_from') or state.raw.get('f_' ~ c.key ~ '_to') %}{% set ns.rest_active = true %}{% endif %}{% endfor %}
 <form class="listbar" method="get" role="search" data-listbar>
   {% for k, v in state.extras.items() if k not in own %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+  <input type="hidden" name="per_page" value="{{ state.per_page }}">
   <div class="listbar-row">
     <div class="field grow">
-      <label for="lq">Search</label>
+      <label class="sr-only" for="lq">Search {{ noun }}</label>
       <div class="search">{{ icon('search', 'i-s') }}<input id="lq" name="q" type="search" value="{{ state.q }}" maxlength="80" placeholder="{{ placeholder }}" autocomplete="off"></div>
     </div>
-    <div class="field">
+    <div class="field only-phone">
       <label for="lsort">Sort by</label>
-      <select id="lsort" name="sort">{% for c in state.spec.cols if c.can_sort %}<option value="{{ c.key }}" {% if state.sort == c.key %}selected{% endif %}>{{ c.label }}</option>{% endfor %}</select>
+      <select id="lsort" name="sort" data-autosubmit>{% for c in state.spec.cols if c.can_sort %}<option value="{{ c.key }}" {% if state.sort == c.key %}selected{% endif %}>{{ c.label }}</option>{% endfor %}</select>
     </div>
-    <div class="field">
+    <div class="field only-phone">
       <label for="ldir">Order</label>
-      <select id="ldir" name="dir"><option value="desc" {% if state.dir == 'desc' %}selected{% endif %}>Highest / newest first</option><option value="asc" {% if state.dir == 'asc' %}selected{% endif %}>Lowest / oldest first</option></select>
+      <select id="ldir" name="dir" data-autosubmit><option value="desc" {% if state.dir == 'desc' %}selected{% endif %}>Newest first</option><option value="asc" {% if state.dir == 'asc' %}selected{% endif %}>Oldest first</option></select>
     </div>
-    <div class="field">
-      <label for="lpp">Rows per page</label>
-      <select id="lpp" name="per_page" data-autosubmit>{% for n in [10, 20, 25, 50, 100, 200] %}<option value="{{ n }}" {% if state.per_page == n %}selected{% endif %}>{{ n }}</option>{% endfor %}</select>
-    </div>
+    {% if inline_caller and caller %}<div class="field inline-check">{{ caller() }}</div>{% endif %}
     <div class="actions">
-      <button class="btn btn-primary" type="submit">Apply</button>
+      <button class="btn btn-primary" type="submit">Search</button>
+      <details class="menu">
+        <summary class="btn" aria-label="Choose columns">Columns<span class="n-soft">{{ state.visible|length }}/{{ state.spec.cols|length }}</span></summary>
+        <div class="menu-list menu-cols" role="group" aria-label="Columns shown">
+          <div class="col-grid">
+            {% for c in state.spec.cols %}
+            <div class="check"><input id="col-{{ c.key }}" type="checkbox" name="cols" value="{{ c.key }}" {% if c.key in state.visible_keys %}checked{% endif %}><label for="col-{{ c.key }}">{{ c.label }}</label></div>
+            {% endfor %}
+          </div>
+          <div class="menu-foot"><button class="btn btn-primary btn-small" type="submit">Show these columns</button><a class="btn btn-quiet btn-small" href="{{ state.url(cols=None) }}">Standard columns</a></div>
+        </div>
+      </details>
       {% if download %}
       <details class="menu">
-        <summary class="btn">{{ download_label }}</summary>
+        <summary class="btn">{{ icon('download', 'i-s') }}{{ download_label }}</summary>
         <div class="menu-list" role="menu">
           <a role="menuitem" href="{{ state.url(export='xlsx') }}" download>Excel (.xlsx)</a>
           <a role="menuitem" href="{{ state.url(export='csv') }}" download>CSV (.csv)</a>
@@ -62,50 +101,27 @@
       {% endif %}
     </div>
   </div>
-  {{ caller() if caller }}
+  {% if caller and not inline_caller %}{{ caller() }}{% endif %}
+  {% if fcols %}
   <details class="more" {% if state.filter_count %}open{% endif %}>
     <summary>Filters{% if state.filter_count %}<span class="n">{{ state.filter_count }}</span>{% endif %}</summary>
     <div class="filter-grid">
-      {% for c in state.spec.cols if c.can_filter %}
-      {% set n = 'f_' ~ c.key %}
-      <div class="field">
-        {% if c.kind in ('date', 'datetime', 'number', 'money', 'qty', 'duration') %}
-        <span class="label">{{ c.label }}{% if c.kind == 'duration' %} <span class="faint">(seconds)</span>{% endif %}</span>
-        <div class="range">
-          <input name="{{ n }}_from" aria-label="{{ c.label }} from" type="{{ 'date' if c.kind in ('date', 'datetime') else 'text' }}" {% if c.kind not in ('date', 'datetime') %}inputmode="decimal" placeholder="Min"{% endif %} value="{{ state.raw.get(n ~ '_from', '') }}">
-          <span class="faint" aria-hidden="true">to</span>
-          <input name="{{ n }}_to" aria-label="{{ c.label }} to" type="{{ 'date' if c.kind in ('date', 'datetime') else 'text' }}" {% if c.kind not in ('date', 'datetime') %}inputmode="decimal" placeholder="Max"{% endif %} value="{{ state.raw.get(n ~ '_to', '') }}">
-        </div>
-        {% elif c.kind == 'choice' %}
-        <label for="{{ n }}">{{ c.label }}</label>
-        <select id="{{ n }}" name="{{ n }}"><option value="{{ 'all' if c.key in state.spec.defaults else '' }}">Any</option>{% for v, lbl in c.choices %}<option value="{{ v }}" {% if state.raw.get(n) == v %}selected{% endif %}>{{ lbl }}</option>{% endfor %}</select>
-        {% elif c.kind == 'bool' %}
-        <label for="{{ n }}">{{ c.label }}</label>
-        <select id="{{ n }}" name="{{ n }}"><option value="">Any</option><option value="1" {% if state.raw.get(n) == '1' %}selected{% endif %}>Yes</option><option value="0" {% if state.raw.get(n) == '0' %}selected{% endif %}>No</option></select>
-        {% else %}
-        <label for="{{ n }}">{{ c.label }} <span class="faint">contains</span></label>
-        <input id="{{ n }}" name="{{ n }}" type="text" maxlength="80" value="{{ state.raw.get(n, '') }}" autocomplete="off">
-        {% endif %}
-      </div>
-      {% endfor %}
+      {% for c in quick %}{{ filter_field(c, state) }}{% endfor %}
     </div>
-    <div class="actions">
+    {% if rest %}
+    <details class="more-inner" {% if ns.rest_active %}open{% endif %}>
+      <summary>More filters</summary>
+      <div class="filter-grid">
+        {% for c in rest %}{{ filter_field(c, state) }}{% endfor %}
+      </div>
+    </details>
+    {% endif %}
+    <div class="actions filter-actions">
       <button class="btn btn-primary" type="submit">Apply filters</button>
       {% if state.filter_count or state.q %}<a class="btn btn-quiet" href="{{ state.clear_url() }}">Clear all</a>{% endif %}
     </div>
   </details>
-  <details class="more">
-    <summary>Columns<span class="n">{{ state.visible|length }}/{{ state.spec.cols|length }}</span></summary>
-    <div class="col-grid">
-      {% for c in state.spec.cols %}
-      <div class="check"><input id="col-{{ c.key }}" type="checkbox" name="cols" value="{{ c.key }}" {% if c.key in state.visible_keys %}checked{% endif %}><label for="col-{{ c.key }}">{{ c.label }}</label></div>
-      {% endfor %}
-    </div>
-    <div class="actions">
-      <button class="btn btn-primary" type="submit">Show these columns</button>
-      <a class="btn btn-quiet" href="{{ state.url(cols=None) }}">Standard columns</a>
-    </div>
-  </details>
+  {% endif %}
 </form>
 {% set chips = state.chips() %}
 {% if chips %}
@@ -126,14 +142,14 @@
       <tbody>
       {% for r in page.rows %}
         <tr>
-          {% for c in state.visible %}<td class="{{ 'num' if c.is_num }}">{% if cellfn %}{{ cellfn(c, r) }}{% else %}{{ cell(c, r) }}{% endif %}</td>{% endfor %}
+          {% for c in state.visible %}<td class="{{ 'num' if c.is_num else ('txt' if c.kind == 'text' else ('ch' if c.kind == 'choice')) }}">{% if cellfn %}{{ cellfn(c, r) }}{% else %}{{ cell(c, r) }}{% endif %}</td>{% endfor %}
           {% if actionfn %}<td>{{ actionfn(r) }}</td>{% endif %}
         </tr>
       {% endfor %}
       </tbody>
       {% if page.totals %}
       <tfoot><tr class="totals-row">
-        {% for c in state.visible %}<td class="{{ 'num' if c.is_num }}">{% if loop.first %}<b>Total of all {{ page.total }} matching</b>{% else %}<b>{{ total_cell(c, page) }}</b>{% endif %}</td>{% endfor %}
+        {% for c in state.visible %}{% set tc = total_cell(c, page)|trim %}<td class="{{ 'num' if c.is_num }}{{ ' cell-empty' if not loop.first and not tc }}">{% if loop.first %}<b>Total of all {{ page.total }} matching</b>{% elif tc %}<b>{{ tc }}</b>{% endif %}</td>{% endfor %}
         {% if actionfn %}<td></td>{% endif %}
       </tr></tfoot>
       {% endif %}
@@ -146,6 +162,7 @@
 {% if page.total %}
 <nav class="pager2" aria-label="Pages">
   <p class="small muted pager-count">Showing <b>{{ page.start }}</b> to <b>{{ page.end }}</b> of <b>{{ page.total }}</b></p>
+  <div class="pager-size" role="group" aria-label="Rows per page"><span class="small muted">Rows</span>{% for n in [10, 20, 50, 100] %}{% if n == state.per_page %}<span class="chip-n on" aria-current="true">{{ n }}</span>{% else %}<a class="chip-n" href="{{ state.url(per_page=n, page=1) }}">{{ n }}</a>{% endif %}{% endfor %}</div>
   {% if page.pages > 1 %}
   <div class="pager-nav">
     {% if page.page > 1 %}<a class="btn btn-small" href="{{ state.url(page=1) }}" aria-label="First page">&laquo;</a><a class="btn btn-small" href="{{ state.url(page=page.page - 1) }}">Previous</a>{% endif %}

@@ -30,6 +30,7 @@ from app.models import (
     UserPlant,
 )
 from app.models.base import utcnow
+from app.services.audit_labels import action_label, describe
 from app.services.listing import Col, ListSpec
 
 STATE_CHOICES = tuple((code, f"{name} ({code})") for code, name in sorted(GST_STATES.items(), key=lambda kv: kv[1]))
@@ -88,10 +89,10 @@ def order_spec(db: Session | None = None, *, defaults: dict[str, str] | None = N
     cols = [
         Col("so_number", "Order no.", O.so_number, search=True, value=lambda o: o.so_number or f"Draft #{o.id}"),
         Col("so_type", "Type", O.so_type, "choice", _enum_choices(SOType, "short"), coerce=SOType, default=False, value=lambda o: o.so_type.short),
-        Col("party_name", "Customer", O.party_name, search=True),
+        Col("party_name", "Customer", O.party_name, search=True, quick=True),
         Col("customer_po_number", "PO number", O.customer_po_number, search=True, default=False),
-        Col("plant_name", "Plant", O.plant_name, search=True, default=False),
-        Col("order_date", "Order date", O.order_date, "date"),
+        Col("plant_name", "Plant", O.plant_name, search=True, default=False, quick=True),
+        Col("order_date", "Order date", O.order_date, "date", quick=True),
         Col("billing_state_code", "Billing state", O.billing_state_code, "choice", STATE_CHOICES, default=False, value=lambda o: _state_name(o.billing_state_code)),
         Col("tax_mode", "Tax", O.tax_mode, "choice", (("cgst_sgst", "CGST + SGST"), ("igst", "IGST")), default=False,
             coerce=TaxMode, value=lambda o: o.tax_mode.label),
@@ -99,12 +100,12 @@ def order_spec(db: Session | None = None, *, defaults: dict[str, str] | None = N
         Col("cgst_amount", "CGST (Rs)", O.cgst_amount, "money", total=True, default=False),
         Col("sgst_amount", "SGST (Rs)", O.sgst_amount, "money", total=True, default=False),
         Col("igst_amount", "IGST (Rs)", O.igst_amount, "money", total=True, default=False),
-        Col("total_amount", "Total (Rs)", O.total_amount, "money", total=True),
-        Col("status", "Status", O.status, "choice", _enum_choices(SOStatus), coerce=SOStatus, value=lambda o: o.status.label),
-        Col("tally_status", "Tally", O.tally_status, "choice", _enum_choices(TallyStatus), coerce=TallyStatus, value=lambda o: o.tally_status.label),
+        Col("total_amount", "Total (Rs)", O.total_amount, "money", total=True, quick=True),
+        Col("status", "Status", O.status, "choice", _enum_choices(SOStatus), coerce=SOStatus, value=lambda o: o.status.label, quick=True),
+        Col("tally_status", "Tally", O.tally_status, "choice", _enum_choices(TallyStatus), coerce=TallyStatus, value=lambda o: o.tally_status.label, quick=True),
         Col("tally_reference", "Tally reference", O.tally_reference, search=True, default=False),
-        Col("created_by", "Created by", _uname(O.created_by_id), search=True, value=lambda o: o.created_by.full_name),
-        Col("created_at", "Created at", O.created_at, "datetime"),
+        Col("created_by", "Created by", _uname(O.created_by_id), search=True, value=lambda o: o.created_by.full_name, quick=True, default=False),
+        Col("created_at", "Created at", O.created_at, "datetime", default=False),
         Col("submitted_at", "Submitted at", O.submitted_at, "datetime", default=False),
         Col("reviewed_by", "Decision by", _uname(O.reviewed_by_id), search=True, default=False, value=lambda o: o.reviewed_by.full_name if o.reviewed_by else None),
         Col("reviewed_at", "Approved / sent back at", O.reviewed_at, "datetime", default=False),
@@ -284,13 +285,13 @@ def audit_spec(db: Session) -> ListSpec:
     cols = [
         Col("at", "When", A.at, "datetime"),
         Col("actor_email", "Who", A.actor_email, search=True, value=lambda r: r.actor_email or "System"),
-        Col("action", "Event", A.action, "choice", tuple((a, a.replace("_", " ")) for a in actions), value=lambda r: r.action.replace("_", " ")),
+        Col("action", "Event", A.action, "choice", tuple((a, action_label(a)) for a in actions), value=lambda r: action_label(r.action)),
         Col("entity_type", "Record type", A.entity_type, "choice", tuple((k, k.replace("_", " ")) for k in kinds), default=False),
         Col("entity_id", "Record id", A.entity_id, "number", default=False),
         Col("record", "Record", None, sortable=False, filterable=False,
             value=lambda r: f"{r.entity_type.replace('_', ' ')} {r.entity_id or ''}".strip() if r.entity_type else ""),
         Col("details", "Details", cast(A.details, Text), search=True, sortable=False,
-            value=lambda r: "; ".join(f"{k}: {v}" for k, v in r.details.items()) if r.details else ""),
+            value=lambda r: describe(r.details)),
         Col("ip_address", "IP address", A.ip_address, search=True),
         Col("request_id", "Request id", A.request_id, search=True, default=False),
     ]

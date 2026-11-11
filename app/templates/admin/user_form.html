@@ -23,9 +23,10 @@
       {% if errors.get('role') %}<span class="error" id="e-role">{{ errors['role'] }}</span>{% endif %}
     </div>
   </div>
-  <fieldset class="plant-pick">
-    <legend>Regions (plants) <span class="faint">sales role only</span></legend>
-    <p class="hint">A sales person can only create orders for the plants ticked here. Nothing ticked means they cannot create orders.</p>
+  <p class="hint region-note" data-region-note {% if values.get('role') == 'sales' %}hidden{% endif %}>Regions apply to sales people only. Accounts in-charge and admins work across all regions.</p>
+  <fieldset class="plant-pick" data-sales-only {% if values.get('role') != 'sales' %}hidden{% endif %}>
+    <legend>Regions (plants)</legend>
+    <p class="hint">This sales person can only create orders for the plants ticked here. Nothing ticked means they cannot create orders.</p>
     <div class="plant-grid">
       {% for pl in all_plants %}
       <div class="check"><input id="pl-{{ pl.id }}" type="checkbox" name="plant_ids" value="{{ pl.id }}" {% if pl.id in chosen_plants %}checked{% endif %}><label for="pl-{{ pl.id }}">{{ pl.name }}</label></div>

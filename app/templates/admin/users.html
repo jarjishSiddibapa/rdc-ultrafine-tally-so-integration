@@ -6,7 +6,7 @@
 {% macro user_cell(c, r) %}
   {%- if c.key == 'full_name' -%}<span class="who"><span class="avatar avatar-s" aria-hidden="true">{{ initials(r.full_name) }}</span><span class="cell-main">{{ r.full_name }}</span></span>
   {%- elif c.key == 'role' -%}{{ r.role.label }}
-  {%- elif c.key == 'plants' -%}{% if r.role == Role.SALES %}{{ r.plants|map(attribute='name')|join(', ') or 'No plants assigned' }}{% endif %}
+  {%- elif c.key == 'plants' -%}{% if r.role == Role.SALES %}{{ r.plants|map(attribute='name')|join(', ') or 'No plants assigned' }}{% else %}All regions{% endif %}
   {%- elif c.key == 'status' -%}
     {% if r.deleted_at %}<span class="badge badge-bad">Removed</span>
     {% elif not r.is_active %}<span class="badge">Disabled</span>

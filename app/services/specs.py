@@ -207,7 +207,7 @@ def user_spec() -> ListSpec:
         Col("full_name", "Name", User.full_name, search=True),
         Col("email", "Email", User.email, search=True),
         Col("role", "Role", User.role, "choice", _enum_choices(Role), coerce=Role, value=lambda u: u.role.label),
-        Col("plants", "Plants", plants, search=True, value=lambda u: ", ".join(p.name for p in u.plants) if u.role is Role.SALES else ""),
+        Col("plants", "Plants", plants, search=True, value=lambda u: ", ".join(p.name for p in u.plants) if u.role is Role.SALES else "All regions"),
         Col("status", "Status", None, "choice", USER_STATUS, where=_user_status_where, sortable=False, value=lambda u: dict(USER_STATUS)[user_status(u, now)]),
         Col("last_login_at", "Last sign-in", User.last_login_at, "datetime"),
         Col("created_at", "Created at", User.created_at, "datetime", default=False),

@@ -12,6 +12,7 @@ from app.models import (
     PasswordReset,
     QueuedEmail,
     SalesOrder,
+    User,
     UserSession,
 )
 from app.models.base import utcnow
@@ -556,6 +557,19 @@ def test_new_user_form_falls_back_to_on_screen_password(client, data, db, monkey
     assert 'class="cred"' in r.text and not _mails(db, "other.hire@example.com", "welcome")
     form = client.get("/admin/users/new").text
     assert 'name="email_login"' in form and "checked" in form.split('name="email_login"')[1][:40]
+
+
+def test_regions_apply_to_sales_only(client, data, db):
+    login(client, "admin@example.com")
+    new = client.get("/admin/users/new").text
+    assert "data-sales-only" in new and "data-region-note" in new                  # no role chosen yet: picker hidden
+    users = client.get("/admin/users").text
+    assert "All regions" in users                                                   # admin and accounts are not restricted
+    uid = db.execute(select(User.id).where(User.email == "accounts@example.com")).scalar_one()
+    edit = client.get(f"/admin/users/{uid}").text
+    assert re.search(r"data-sales-only\s+hidden", edit)
+    sid = db.execute(select(User.id).where(User.email == "sales@example.com")).scalar_one()
+    assert not re.search(r"data-sales-only\s+hidden", client.get(f"/admin/users/{sid}").text)
 
 
 def test_resend_welcome_issues_a_new_password_once_a_minute(client, data, db, monkeypatch):

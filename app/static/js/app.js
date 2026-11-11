@@ -258,6 +258,19 @@
 })();
 
 
+/* User form: regions only apply to the sales role, so the picker appears only when Sales is chosen. */
+(function () {
+  "use strict";
+  var role = document.getElementById("f-role");
+  var box = document.querySelector("[data-sales-only]");
+  var note = document.querySelector("[data-region-note]");
+  if (!role || !box) return;
+  function sync() { var sales = role.value === "sales"; box.hidden = !sales; if (note) note.hidden = sales; }
+  role.addEventListener("change", sync);
+  sync();
+})();
+
+
 /* Notification bell: keeps the unread badge and the dropdown fresh. It asks the server every 30 seconds while the
    tab is visible. The summary request does not count as activity, so an abandoned tab still signs out on time. */
 (function () {

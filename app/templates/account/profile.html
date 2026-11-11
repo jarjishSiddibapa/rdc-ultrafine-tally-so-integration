@@ -10,7 +10,7 @@
     <div><dt>Name</dt><dd>{{ user.full_name }}</dd></div>
     <div><dt>Email</dt><dd>{{ user.email }}</dd></div>
     <div><dt>Role</dt><dd>{{ user.role.label }}</dd></div>
-    {% if user.role == Role.SALES %}<div><dt>Plants you can order for</dt><dd>{{ user.plants|map(attribute='name')|join(', ') or 'None assigned yet' }}</dd></div>{% endif %}
+    <div><dt>Regions</dt><dd>{% if user.role == Role.SALES %}{{ user.plants|map(attribute='name')|join(', ') or 'None assigned yet' }}{% else %}All regions{% endif %}</dd></div>
     <div><dt>Last signed in</dt><dd>{{ (user.last_login_at|dt) if user.last_login_at else 'This is your first sign-in' }}</dd></div>
     <div><dt>Password last changed</dt><dd>{{ (user.password_changed_at|dt) if user.password_changed_at else 'Never' }}</dd></div>
   </dl>

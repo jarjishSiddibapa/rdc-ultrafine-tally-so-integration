@@ -98,7 +98,7 @@ Demo users (all with the password printed by the script): `riya.sales@demo.examp
 
 ```powershell
 $env:MAIL_ENABLED="true"; $env:MAIL_FROM="no-reply@rdc.in"; $env:APP_BASE_URL="http://localhost:1401"
-.env\Scripts\python.exe -m pytest
+.venv\Scripts\python.exe -m pytest
 ```
 
 The suite (114 tests covering the order workflow, lists and reports, notifications and email, and unit logic) uses its own `TEST_DB_NAME` database and refuses to run against the real one. The three environment variables above are what the email tests expect; without them two of those tests fail. Run one pytest process at a time, because each run rebuilds the test schema.

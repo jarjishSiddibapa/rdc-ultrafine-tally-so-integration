@@ -13,7 +13,8 @@ Built with FastAPI, SQLAlchemy and MySQL, server-rendered with Jinja2.
 - **Three roles:** Sales (own orders only), Accounts in-charge (approves, manages masters) and Admin (users, settings, audit log, Tally queue). Authorisation is enforced on the server for every route.
 - **Order workflow:** `Draft -> Awaiting approval -> Approved`, or `Sent back -> edit -> Awaiting approval`. An approver cannot approve their own order.
 - **Gap-free numbering per financial year** (for example `SO/26-27/00012`), allocated on first submit, with a separate series for trading orders.
-- **GST rule from the company SOP:** the plant's state is compared with the customer's billing state. Same state gives Output CGST + SGST (half rate each), otherwise Output IGST at the full rate. A live tax preview updates as the form is filled in, and the server recalculates on save.
+- **Customer addresses are fixed master data:** a customer can have several (head office, depots, godowns, with one default), managed on the customer's page. An order never has a typed address: the sales person picks the billing and shipping address from that list. The order keeps a copy of the text, so editing a customer later does not change old orders.
+- **GST rule from the company SOP:** the plant's state is compared with the state of the chosen billing address. Same state gives Output CGST + SGST (half rate each), otherwise Output IGST at the full rate. A live tax preview updates as the form is filled in, and the server recalculates on save.
 - **Tally queue:** approving an order writes the order and a `tally_outbox` row in **one transaction**, so nothing is lost if Tally is down. A background worker delivers rows with exponential back-off, then marks them for an admin to retry. The real Tally API call is not connected yet; until `TALLY_API_URL` is set, approved orders wait safely in the queue.
 - **Notifications:** an in-app bell and inbox, plus email through a database-backed queue with retries (approvers when an order is submitted, creators when it is approved or sent back, admins when delivery fails).
 - **Audit and reports:** an append-only audit log of logins and every change, per-order lifecycle timeline, filterable lists with column choice and download, and a reports area.
@@ -101,7 +102,7 @@ $env:MAIL_ENABLED="true"; $env:MAIL_FROM="no-reply@rdc.in"; $env:APP_BASE_URL="h
 .\venv\Scripts\python.exe -m pytest
 ```
 
-The suite (114 tests covering the order workflow, lists and reports, notifications and email, and unit logic) uses its own `TEST_DB_NAME` database and refuses to run against the real one. The three environment variables above are what the email tests expect; without them two of those tests fail. Run one pytest process at a time, because each run rebuilds the test schema.
+The suite (122 tests covering the order workflow, customer addresses, lists and reports, notifications and email, and unit logic) uses its own `TEST_DB_NAME` database and refuses to run against the real one. The three environment variables above are what the email tests expect; without them two of those tests fail. Run one pytest process at a time, because each run rebuilds the test schema.
 
 ## Security
 

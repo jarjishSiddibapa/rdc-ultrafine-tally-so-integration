@@ -1,6 +1,17 @@
 {% extends "base.html" %}
-{% from "_macros.html" import icon, csrf, field, textarea, state_select with context %}
+{% from "_macros.html" import icon, csrf, field, textarea with context %}
 {% block title %}{{ 'Edit order' if order else 'New sales order' }} · {{ app_name }}{% endblock %}
+{% macro address_pick(name, label, selected) %}
+<div class="field" data-addr-field>
+  <label for="f-{{ name }}">{{ label }} <span class="faint">(required)</span></label>
+  <select id="f-{{ name }}" name="{{ name }}" required {% if errors.get(name) %}aria-invalid="true" aria-describedby="e-{{ name }}"{% endif %}>
+    <option value="">{{ 'Choose the address' if cur_addresses else ('This customer has no address' if form.party_id else 'Choose a customer first') }}</option>
+    {% for a in cur_addresses %}<option value="{{ a.id }}" data-state="{{ a.state }}" data-text="{{ a.text }}" data-state-name="{{ a.state_name }}" {% if selected == a.id|string %}selected{% endif %}>{{ a.label }}{% if a.default %} (default){% endif %}</option>{% endfor %}
+  </select>
+  <div class="fixed-value addr-preview" data-addr-preview aria-live="polite">{% for a in cur_addresses if selected == a.id|string %}{{ a.text }}, {{ a.state_name }}{% else %}<span class="faint">The address appears here once you choose it.</span>{% endfor %}</div>
+  {% if errors.get(name) %}<span class="error" id="e-{{ name }}">{{ errors[name] }}</span>{% endif %}
+</div>
+{% endmacro %}
 {% block content %}
 <nav class="crumbs" aria-label="Breadcrumb"><a href="/orders">Orders</a><span aria-hidden="true">/</span><span>{{ 'Edit' if order else 'New' }}</span></nav>
 <div class="page-head">
@@ -55,8 +66,8 @@
             <select id="f-party_id" name="party_id" required {% if errors.get('party_id') %}aria-invalid="true" aria-describedby="e-party_id"{% endif %}>
               <option value="">Choose a customer</option>
               {% for p in parties %}
-              <option value="{{ p.id }}" data-state="{{ p.state_code or '' }}" data-term="{{ p.default_payment_term or '' }}"
-                      data-address="{{ [p.address_line1, p.address_line2, p.city, p.pincode]|select|join(', ') }}"
+              <option value="{{ p.id }}" data-term="{{ p.default_payment_term or '' }}"
+                      data-addresses='{{ party_addresses[p.id]|tojson }}'
                       {% if form.party_id == p.id|string %}selected{% endif %}>{{ p.name }}</option>
               {% endfor %}
             </select>
@@ -65,10 +76,13 @@
           </div>
           {{ field('customer_po_number', 'PO number (as per customer PO)', form.customer_po_number, errors, required=True, maxlength=60) }}
           {{ field('payment_term', 'Payment term (as per PO)', form.payment_term, errors, required=True, maxlength=200) }}
-          {{ textarea('billing_address', 'Billing address', form.billing_address, errors, required=True) }}
-          {{ textarea('shipping_address', 'Shipping address', form.shipping_address, errors, required=True) }}
-          {{ state_select('billing_state_code', 'Billing state', form.billing_state_code, errors, required=True) }}
-          {{ state_select('shipping_state_code', 'Shipping state', form.shipping_state_code, errors, blank='Same as billing or not known') }}
+          <div class="span-all addr-group">
+            <div class="form-grid">
+              {{ address_pick('billing_address_id', 'Billing address', form.billing_address_id) }}
+              {{ address_pick('shipping_address_id', 'Shipping address', form.shipping_address_id) }}
+            </div>
+            <p class="hint addr-note" id="addr-note">The addresses come from the customer's record and cannot be changed here. A customer can have several; pick the one this order is for. To add or correct an address, ask accounts to update the customer under Master data.</p>
+          </div>
         </div>
       </section>
 

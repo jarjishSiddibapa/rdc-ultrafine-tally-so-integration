@@ -7,6 +7,7 @@ from app.models.entities import (  # noqa: F401
     Notification,
     NotificationPref,
     Party,
+    PartyAddress,
     PasswordReset,
     Plant,
     QueuedEmail,

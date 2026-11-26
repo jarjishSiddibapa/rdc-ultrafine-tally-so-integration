@@ -13,7 +13,7 @@ from sqlalchemy import text
 from app.core.config import get_settings
 from app.core.database import get_engine, init_engine, session_factory
 from app.core.security import csrf_token_for, login_limiter
-from app.models import Base, Item, Party, Plant, Role, SalesLedger, User
+from app.models import Base, Item, Party, PartyAddress, Plant, Role, SalesLedger, User
 from app.services import auth as auth_service
 
 PASSWORD = "Str0ngPassw0rd!"
@@ -68,13 +68,17 @@ def data(db):
         "accounts": _mk_user(db, "accounts@example.com", Role.ACCOUNTS, "Anil Accounts"),
         "admin": _mk_user(db, "admin@example.com", Role.ADMIN, "Ada Admin"),
     }
-    d["party_gj"] = Party(name="Alpha Traders", gstin="24ABCDE1234F1Z5", state_code="24", address_line1="1 Mill Road", city="Ahmedabad", pincode="380001", default_payment_term="30 days")
-    d["party_mh"] = Party(name="Beta Industries", gstin="27ABCDE1234F1Z5", state_code="27", address_line1="9 Port Road", city="Mumbai", pincode="400001")
+    d["party_gj"] = Party(name="Alpha Traders", gstin="24ABCDE1234F1Z5", state_code="24", default_payment_term="30 days")
+    d["party_mh"] = Party(name="Beta Industries", gstin="27ABCDE1234F1Z5", state_code="27")
+    # Alpha has two addresses (Ahmedabad default, and a Mumbai depot in another state); Beta has one.
+    d["addr_gj"] = PartyAddress(party=d["party_gj"], label="Head office", address_line1="1 Mill Road", city="Ahmedabad", state_code="24", pincode="380001", is_default=True)
+    d["addr_gj_mh"] = PartyAddress(party=d["party_gj"], label="Mumbai depot", address_line1="22 Dock Lane", city="Mumbai", state_code="27", pincode="400010")
+    d["addr_mh"] = PartyAddress(party=d["party_mh"], label="Head office", address_line1="9 Port Road", city="Mumbai", state_code="27", pincode="400001", is_default=True)
     d["item"] = Item(name="Ultrafine", hsn_code="2523", gst_rate=18, unit="MT")
     d["ledger"] = SalesLedger(name="Sales GST")
     d["plant_gj"] = Plant(name="Gujarat plant", state_code="24")
     d["plant_mh"] = Plant(name="Maharashtra plant", state_code="27")
-    db.add_all([d["party_gj"], d["party_mh"], d["item"], d["ledger"], d["plant_gj"], d["plant_mh"]])
+    db.add_all([d["party_gj"], d["party_mh"], d["addr_gj"], d["addr_gj_mh"], d["addr_mh"], d["item"], d["ledger"], d["plant_gj"], d["plant_mh"]])
     d["sales"].plants = [d["plant_gj"], d["plant_mh"]]    # sales people only see the plants assigned to them
     d["sales2"].plants = [d["plant_gj"], d["plant_mh"]]
     db.commit()
@@ -112,8 +116,7 @@ def order_form(d: dict, **over) -> dict:
     base = {
         "so_type": "sales_order", "order_date": __import__("app.core.utils", fromlist=["today_ist"]).today_ist().isoformat(),
         "party_id": str(d["party_gj"].id), "plant_id": str(d["plant_gj"].id), "payment_term": "30 days from invoice", "customer_po_number": "PO-1001",
-        "billing_address": "1 Mill Road, Ahmedabad", "billing_state_code": "24",
-        "shipping_address": "1 Mill Road, Ahmedabad", "shipping_state_code": "24",
+        "billing_address_id": str(d["addr_gj"].id), "shipping_address_id": str(d["addr_gj"].id),
         "remarks": "OK",
         "item_id": [str(d["item"].id)], "quantity": ["100"], "rate": ["12500"], "action": "submit",
     }

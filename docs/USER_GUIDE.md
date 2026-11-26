@@ -21,6 +21,14 @@ otherwise Output IGST at the full rate. The company has several plants, so each 
 plant's GST state is what the customer's billing state is compared with. Plants are master data (**Master data > Plants**,
 seeded with the 13 states the company operates in); orders cannot be created until a plant is chosen, so tax is never guessed.
 
+Customer addresses are fixed master data. A customer can have several (**Master data > Customers**, open a customer, then
+**Addresses**: head office, depots, godowns, with one default). An order never has a typed address: the sales person picks
+the billing and shipping address from the customer's saved list, and the chosen billing address decides the billing state
+and so the tax. The order keeps a copy of the address text when it is saved, so editing a customer's address later does not
+change old orders. A customer with no address cannot be ordered for.
+
+Regions (plants) restrict sales people only. Accounts in-charge and admins work across all of them.
+
 ## Run
 
 ```powershell

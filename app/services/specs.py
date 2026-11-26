@@ -17,6 +17,7 @@ from app.models import (
     Item,
     OutboxStatus,
     Party,
+    PartyAddress,
     Plant,
     Role,
     SalesOrder,
@@ -243,15 +244,26 @@ def master_spec(slug: str, db: Session) -> ListSpec:
         Col("deleted_at", "Removed at", M.deleted_at, "datetime", default=False),
     ]
     if slug == "parties":
+        PA = PartyAddress
+        live = and_(PA.party_id == M.id, PA.deleted_at.is_(None))
+
+        def _addr_sub(expr):
+            return select(expr).where(live).correlate_except(PA).scalar_subquery()
+
         cols = [
             Col("name", "Name", M.name, search=True),
             Col("gstin", "GSTIN", M.gstin, search=True),
             Col("state_code", "State", M.state_code, "choice", STATE_CHOICES, value=lambda r: _state_name(r.state_code)),
-            Col("city", "City", M.city, search=True, default=False),
-            Col("pincode", "Pincode", M.pincode, search=True, default=False),
+            Col("addresses", "Addresses", _addr_sub(func.count(PA.id)), "number",
+                value=lambda r: len(r.usable_addresses)),
+            Col("city", "City", _addr_sub(func.group_concat(PA.city)), search=True, default=False,
+                value=lambda r: ", ".join(dict.fromkeys(a.city for a in r.usable_addresses if a.city))),
+            Col("pincode", "Pincode", _addr_sub(func.group_concat(PA.pincode)), search=True, default=False,
+                value=lambda r: ", ".join(dict.fromkeys(a.pincode for a in r.usable_addresses if a.pincode))),
             Col("default_payment_term", "Usual payment term", M.default_payment_term, search=True, default=False),
-            Col("address", "Address", M.address_line1, search=True, default=False,
-                value=lambda r: ", ".join(x for x in (r.address_line1, r.address_line2) if x)),
+            Col("address", "Addresses (full)", _addr_sub(func.group_concat(func.concat_ws(", ", PA.label, PA.address_line1, PA.address_line2))),
+                search=True, default=False, sortable=False,
+                value=lambda r: "; ".join(f"{a.label}: {a.text}" for a in r.usable_addresses)),
             status, *stamps,
         ]
     elif slug == "plants":

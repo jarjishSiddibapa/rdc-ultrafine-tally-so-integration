@@ -49,7 +49,7 @@ def seed_masters() -> None:
 
     from app.core.config import get_settings
     from app.core.database import init_engine, session_factory
-    from app.models import Item, Party, Plant, Role, SalesLedger, User
+    from app.models import Item, Party, PartyAddress, Plant, Role, SalesLedger, User
     from app.services import auth as auth_service
 
     name = get_settings().db_name
@@ -66,7 +66,8 @@ def seed_masters() -> None:
         db.add(user)
     for n, gstin, state, addr, city, pin, term in PARTIES:
         if not db.execute(select(Party).where(Party.name == n)).scalar_one_or_none():
-            db.add(Party(name=n, gstin=gstin, state_code=state, address_line1=addr, city=city, pincode=pin, default_payment_term=term))
+            db.add(Party(name=n, gstin=gstin, state_code=state, default_payment_term=term, addresses=[
+                PartyAddress(label="Head office", address_line1=addr, city=city, state_code=state, pincode=pin, is_default=True)]))
     for n, hsn, rate, unit in ITEMS:
         if not db.execute(select(Item).where(Item.name == n)).scalar_one_or_none():
             db.add(Item(name=n, hsn_code=hsn, gst_rate=rate, unit=unit))
@@ -104,13 +105,27 @@ def _option(html: str, label: str) -> str:
     return m.group(1)
 
 
+def _default_address(html: str, party_id: str) -> str:
+    """Id of the customer's default saved address, as the order form offers it."""
+    import html as htmllib
+    import json
+
+    m = re.search(r"<option value=\"%s\"[^>]*?data-addresses='([^']*)'" % party_id, html, re.S)
+    assert m, f"no addresses for customer {party_id}"
+    addresses = json.loads(htmllib.unescape(m.group(1)))
+    assert addresses, f"customer {party_id} has no saved address"
+    return str(next((a for a in addresses if a["default"]), addresses[0])["id"])
+
+
 def _create(c, *, party: str, plant: str, po: str, lines: list[tuple[str, str, str]], action: str, days_ago: int, remarks: str, so_type: str = "sales_order") -> int:
     html = c.get("/orders/new").text
-    state = {p[0]: (p[2], f"{p[3]}, {p[4]} {p[5]}", p[6]) for p in PARTIES}[party]
+    term = {p[0]: p[6] for p in PARTIES}[party]
+    party_id = _option(html, party)
+    address_id = _default_address(html, party_id)
     data = {
         "csrf_token": _csrf(c), "so_type": so_type, "order_date": (date.today() - timedelta(days=days_ago)).isoformat(),
-        "party_id": _option(html, party), "plant_id": _option(html, plant), "payment_term": state[2], "customer_po_number": po,
-        "billing_address": state[1], "billing_state_code": state[0], "shipping_address": state[1], "shipping_state_code": state[0],
+        "party_id": party_id, "plant_id": _option(html, plant), "payment_term": term, "customer_po_number": po,
+        "billing_address_id": address_id, "shipping_address_id": address_id,
         "remarks": remarks, "item_id": [_option(html, i[0]) for i in lines],
         "quantity": [i[1] for i in lines], "rate": [i[2] for i in lines], "action": action,
     }

@@ -24,6 +24,7 @@ from app.models import (
     NumberSequence,
     OutboxStatus,
     Party,
+    PartyAddress,
     Role,
     Plant,
     SalesLedger,
@@ -72,10 +73,8 @@ class OrderForm:
     party_id: str = ""
     payment_term: str = ""
     customer_po_number: str = ""
-    billing_address: str = ""
-    billing_state_code: str = ""
-    shipping_address: str = ""
-    shipping_state_code: str = ""
+    billing_address_id: str = ""     # ids of the customer's saved addresses; the text itself can never be typed on an order
+    shipping_address_id: str = ""
     plant_id: str = ""
     remarks: str = ""
     lines: list[LineInput] = field(default_factory=list)
@@ -88,10 +87,8 @@ def parse_form(data) -> OrderForm:  # data: starlette FormData
         party_id=clean_text(data.get("party_id"), 10),
         payment_term=clean_text(data.get("payment_term"), 200),
         customer_po_number=clean_text(data.get("customer_po_number"), 60),
-        billing_address=clean_text(data.get("billing_address"), 600),
-        billing_state_code=clean_text(data.get("billing_state_code"), 2),
-        shipping_address=clean_text(data.get("shipping_address"), 600),
-        shipping_state_code=clean_text(data.get("shipping_state_code"), 2),
+        billing_address_id=clean_text(data.get("billing_address_id"), 10),
+        shipping_address_id=clean_text(data.get("shipping_address_id"), 10),
         plant_id=clean_text(data.get("plant_id"), 10),
         remarks=clean_text(data.get("remarks"), 500),
     )
@@ -115,10 +112,8 @@ class Validated:
     party: Party
     payment_term: str
     customer_po_number: str
-    billing_address: str
-    billing_state_code: str
-    shipping_address: str
-    shipping_state_code: str | None
+    billing: PartyAddress
+    shipping: PartyAddress
     plant: Plant
     ledger: SalesLedger
     narration: str
@@ -193,14 +188,22 @@ def validate(db: Session, f: OrderForm, *, user: User, exclude_order_id: int | N
         errors["payment_term"] = "Enter the payment term from the customer PO."
     if not f.customer_po_number:
         errors["customer_po_number"] = "Enter the customer PO number."
-    if len(f.billing_address) < 5:
-        errors["billing_address"] = "Enter the billing address from the customer PO."
-    if f.billing_state_code not in GST_STATES:
-        errors["billing_state_code"] = "Choose the billing state."
-    if len(f.shipping_address) < 5:
-        errors["shipping_address"] = "Enter the shipping address from the customer PO."
-    if f.shipping_state_code and f.shipping_state_code not in GST_STATES:
-        errors["shipping_state_code"] = "Choose a valid shipping state."
+    billing = shipping = None
+    if party is not None:
+        usable = {a.id: a for a in party.usable_addresses}
+        if not usable:
+            errors["billing_address_id"] = errors["shipping_address_id"] = (
+                "This customer has no address on file. Ask accounts or an administrator to add one under Master data > Customers.")
+        else:
+            billing = usable.get(int(f.billing_address_id)) if f.billing_address_id.isdigit() else None
+            shipping = usable.get(int(f.shipping_address_id)) if f.shipping_address_id.isdigit() else None
+            if billing is None:
+                errors["billing_address_id"] = "Choose the billing address from the customer's addresses."
+            elif billing.state_code not in GST_STATES:
+                billing = None
+                errors["billing_address_id"] = "This address has no GST state. Ask accounts to complete it under Master data > Customers."
+            if shipping is None:
+                errors["shipping_address_id"] = "Choose the shipping address from the customer's addresses."
 
     plant = None
     if f.plant_id.isdigit():
@@ -252,10 +255,9 @@ def validate(db: Session, f: OrderForm, *, user: User, exclude_order_id: int | N
 
     if errors:
         return None, errors
-    assert so_type and od and party and plant
+    assert so_type and od and party and plant and billing and shipping
     return (
-        Validated(so_type, od, party, f.payment_term, f.customer_po_number, f.billing_address, f.billing_state_code,
-                  f.shipping_address, f.shipping_state_code or None, plant, sales_ledger(db),
+        Validated(so_type, od, party, f.payment_term, f.customer_po_number, billing, shipping, plant, sales_ledger(db),
                   build_narration(party.name, lines), f.remarks.strip(), lines),
         {},
     )
@@ -311,7 +313,7 @@ def can_withdraw(user: User, order: SalesOrder) -> bool:
 def _apply(db: Session, order: SalesOrder, v: Validated) -> None:
     if v.plant.state_code not in GST_STATES:
         raise OrderError(f"The plant {v.plant.name} has no valid GST state. Ask an administrator to fix it under Master data > Plants.")
-    mode = tax_mode_for(v.plant.state_code, v.billing_state_code)
+    mode = tax_mode_for(v.plant.state_code, v.billing.state_code)
     totals = compute_totals([(q2(q * r), it.gst_rate) for it, q, r in v.lines], mode)
 
     order.so_type = v.so_type
@@ -321,10 +323,12 @@ def _apply(db: Session, order: SalesOrder, v: Validated) -> None:
     order.party_gstin = v.party.gstin
     order.payment_term = v.payment_term
     order.customer_po_number = v.customer_po_number
-    order.billing_address = v.billing_address
-    order.billing_state_code = v.billing_state_code
-    order.shipping_address = v.shipping_address
-    order.shipping_state_code = v.shipping_state_code
+    order.billing_address_id = v.billing.id
+    order.billing_address = v.billing.text
+    order.billing_state_code = v.billing.state_code
+    order.shipping_address_id = v.shipping.id
+    order.shipping_address = v.shipping.text
+    order.shipping_state_code = v.shipping.state_code
     order.plant_id = v.plant.id
     order.plant_name = v.plant.name
     order.plant_state_code = v.plant.state_code

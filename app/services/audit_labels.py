@@ -15,12 +15,14 @@ ACTIONS = {
     "password_reset_completed": "Password reset completed", "welcome_email_queued": "Welcome email queued",
     "notifications_read_all": "Notifications marked read", "notification_prefs_changed": "Notification settings changed",
     "settings_updated": "System settings changed", "mail_test_sent": "Test email queued",
+    "party_address_created": "Customer address added", "party_address_updated": "Customer address edited",
+    "party_address_default": "Default address changed", "party_address_deleted": "Customer address removed",
 }
 KEYS = {
     "so_number": "Order", "party": "Customer", "total": "Total (Rs)", "remarks": "Remarks", "email": "Email", "role": "Role",
     "plants": "Plants", "reason": "Reason", "attempt": "Attempt", "error": "Error", "reference": "Tally reference", "count": "Count",
     "to": "Sent to", "resend": "Resent", "by_admin": "Requested by admin", "emailed": "Emailed", "expires_minutes": "Expires in (min)",
-    "locked": "Locked", "active": "Active", "format": "Format", "rows": "Rows",
+    "locked": "Locked", "active": "Active", "format": "Format", "rows": "Rows", "customer": "Customer", "address": "Address",
 }
 
 

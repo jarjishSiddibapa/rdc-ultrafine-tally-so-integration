@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf, field, state_select with context %}
+{% block title %}{{ 'Edit address' if row else 'Add address' }} · {{ app_name }}{% endblock %}
+{% block content %}
+<nav class="crumbs" aria-label="Breadcrumb"><a href="/masters/parties">Customers</a><span aria-hidden="true">/</span><a href="/masters/parties/{{ party.id }}">{{ party.name }}</a><span aria-hidden="true">/</span><span>{{ 'Edit address' if row else 'Add address' }}</span></nav>
+<div class="page-head"><div><h1>{{ 'Edit address' if row else 'Add address' }}</h1><p>For {{ party.name }}. Sales people can pick it as a billing or shipping address on their orders.</p></div></div>
+{% if errors %}<div class="notice notice-error" role="alert">Fix the highlighted fields and save again.</div>{% endif %}
+<form method="post" action="{{ '/masters/parties/' ~ party.id ~ '/addresses/' ~ row.id if row else '/masters/parties/' ~ party.id ~ '/addresses/new' }}" class="panel stack-s form-narrow" novalidate>
+  {{ csrf() }}
+  <div class="form-grid">
+    {% for f in address_fields %}
+      {% if f.type == 'state' %}{{ state_select(f.name, f.label, values.get(f.name, ''), errors, required=f.required) }}
+      {% else %}{{ field(f.name, f.label, values.get(f.name, ''), errors, required=f.required, hint=f.hint or '', maxlength=f.max) }}{% endif %}
+    {% endfor %}
+  </div>
+  {% if row %}
+  <div class="check"><input id="is_active" type="checkbox" name="is_active" {% if row.is_active %}checked{% endif %}><label for="is_active">Active (can be chosen on new orders)</label></div>
+  {% endif %}
+  <div class="actions">
+    <button class="btn btn-primary" type="submit">Save address</button>
+    <a class="btn btn-quiet" href="/masters/parties/{{ party.id }}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

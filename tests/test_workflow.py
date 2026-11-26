@@ -143,7 +143,7 @@ def test_full_approval_flow_queues_tally_payload(client, data, db):
 def test_interstate_order_uses_igst_and_trading_numbering(client, data, db):
     login(client, "sales@example.com")
     oid = _create(client, data, so_type="trading_sales_order", party_id=str(data["party_mh"].id),
-                  billing_state_code="27", customer_po_number="PO-MH-1")
+                  billing_address_id=str(data["addr_mh"].id), shipping_address_id=str(data["addr_mh"].id), customer_po_number="PO-MH-1")
     o = db.get(SalesOrder, oid)
     assert o.tax_mode.value == "igst" and o.igst_amount == Decimal("225000.00") and o.cgst_amount == 0
     assert o.so_number.startswith("TSO/")
@@ -194,9 +194,9 @@ def test_duplicate_customer_po_is_blocked(client, data):
 
 def test_validation_errors_are_reported_per_field(client, data):
     login(client, "sales@example.com")
-    r = post(client, "/orders/new", order_form(data, quantity=["-5"], billing_state_code="", remarks="  ", order_date="2999-01-01"))
+    r = post(client, "/orders/new", order_form(data, quantity=["-5"], billing_address_id="", remarks="  ", order_date="2999-01-01"))
     assert r.status_code == 422
-    for needle in ("Quantity must be", "Choose the billing state", "Enter the remarks", "cannot be in the future"):
+    for needle in ("Quantity must be", "Choose the billing address", "Enter the remarks", "cannot be in the future"):
         assert needle in r.text
 
 
@@ -243,7 +243,7 @@ def test_plant_state_decides_the_tax(client, data, db):
     # Maharashtra plant, Gujarat customer -> outside the plant's state -> IGST
     a = _create(client, data, plant_id=str(data["plant_mh"].id), customer_po_number="PO-A")
     # Maharashtra plant, Maharashtra customer -> same state -> CGST + SGST
-    b = _create(client, data, plant_id=str(data["plant_mh"].id), customer_po_number="PO-B", billing_state_code="27")
+    b = _create(client, data, plant_id=str(data["plant_mh"].id), customer_po_number="PO-B", billing_address_id=str(data["addr_gj_mh"].id))
     db.expire_all()
     oa, ob = db.get(SalesOrder, a), db.get(SalesOrder, b)
     assert oa.tax_mode.value == "igst" and oa.plant_name == "Maharashtra plant" and oa.plant_state_code == "27"
@@ -404,7 +404,8 @@ def test_masters_crud_with_soft_delete(client, data, db):
     from app.models import Party
 
     login(client, "accounts@example.com")
-    r = post(client, "/masters/parties/new", {"name": "Gamma Ltd", "gstin": "27abcde1234f1z5", "state_code": "27", "pincode": "400001"})
+    r = post(client, "/masters/parties/new", {"name": "Gamma Ltd", "gstin": "27abcde1234f1z5", "state_code": "27",
+                                              "addr_label": "Main address", "addr_address_line1": "5 Lake Road", "addr_state_code": "27", "addr_pincode": "400001"})
     assert r.status_code == 303
     p = db.query(Party).filter_by(name="Gamma Ltd").one()
     assert p.gstin == "27ABCDE1234F1Z5"

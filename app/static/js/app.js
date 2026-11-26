@@ -102,7 +102,8 @@
 
   function recalc() {
     narrate();
-    var billing = form.querySelector("[name=billing_state_code]").value;
+    var bsel = form.querySelector("[name=billing_address_id]");
+    var billing = bsel && bsel.selectedIndex > 0 ? (bsel.options[bsel.selectedIndex].dataset.state || "") : "";
     var companyState = plantState();
     var byRate = {}, subtotal = 0;
     linesEl.querySelectorAll(".line").forEach(function (row) {
@@ -131,7 +132,7 @@
     var note = document.getElementById("tax-note");
     if (note) {
       note.textContent = !companyState ? "Choose the plant to see which tax applies."
-        : !billing ? "Choose the billing state to see which tax applies."
+        : !billing ? "Choose the billing address to see which tax applies."
         : mode === "cgst" ? "Billing address is in the plant's state: Output CGST and Output SGST apply."
         : "Billing address is outside the plant's state: Output IGST applies.";
     }
@@ -168,23 +169,61 @@
   form.addEventListener("input", recalc);
   form.addEventListener("change", recalc);
 
-  // Picking a customer pre-fills addresses, state and payment term (all still editable).
+  // Addresses belong to the customer and are never typed on the order: choosing a customer loads that customer's saved
+  // addresses into the two pickers, and choosing one shows it read-only underneath.
   var party = form.querySelector("[name=party_id]");
+  var billingSel = form.querySelector("[name=billing_address_id]");
+  var shippingSel = form.querySelector("[name=shipping_address_id]");
+  var shipTouched = !!(shippingSel && shippingSel.value && billingSel && shippingSel.value !== billingSel.value);
+
+  function showAddress(sel) {
+    var box = sel.closest("[data-addr-field]").querySelector("[data-addr-preview]");
+    var o = sel.options[sel.selectedIndex];
+    box.textContent = "";
+    if (o && o.value) { box.textContent = o.dataset.text + ", " + o.dataset.stateName; box.classList.remove("is-empty"); }
+    else { var s = document.createElement("span"); s.className = "faint"; s.textContent = "The address appears here once you choose it."; box.appendChild(s); }
+  }
+
+  function loadAddresses(list, keep) {
+    [billingSel, shippingSel].forEach(function (sel) {
+      var prev = keep ? sel.value : "";
+      sel.textContent = "";
+      var first = document.createElement("option");
+      first.value = "";
+      first.textContent = list.length ? "Choose the address" : "This customer has no address";
+      sel.appendChild(first);
+      list.forEach(function (a) {
+        var op = document.createElement("option");
+        op.value = a.id; op.textContent = a.label + (a.default ? " (default)" : "");
+        op.dataset.state = a.state; op.dataset.text = a.text; op.dataset.stateName = a.state_name;
+        sel.appendChild(op);
+      });
+      var pick = list.filter(function (a) { return String(a.id) === prev; })[0] || list.filter(function (a) { return a.default; })[0] || (list.length === 1 ? list[0] : null);
+      sel.value = pick ? String(pick.id) : "";
+      showAddress(sel);
+    });
+  }
+
+  if (billingSel && shippingSel) {
+    billingSel.addEventListener("change", function () {
+      if (!shipTouched) { shippingSel.value = billingSel.value; showAddress(shippingSel); }
+      showAddress(billingSel);
+    });
+    shippingSel.addEventListener("change", function () { shipTouched = true; showAddress(shippingSel); });
+  }
+
   party.addEventListener("change", function () {
     var o = party.options[party.selectedIndex];
-    if (!o || !o.value) return;
-    var fill = function (name, val, onlyIfEmpty) {
-      var el = form.querySelector("[name=" + name + "]");
-      if (el && val && (!onlyIfEmpty || !el.value.trim())) el.value = val;
-    };
-    var addr = o.dataset.address || "";
-    fill("billing_address", addr, true);
-    fill("shipping_address", addr, true);
-    fill("billing_state_code", o.dataset.state, true);
-    fill("shipping_state_code", o.dataset.state, true);
-    fill("payment_term", o.dataset.term, true);
+    shipTouched = false;
+    if (!o || !o.value) { loadAddresses([], false); recalc(); return; }
+    var list = [];
+    try { list = JSON.parse(o.dataset.addresses || "[]"); } catch (e) { list = []; }
+    loadAddresses(list, false);
+    var term = form.querySelector("[name=payment_term]");
+    if (term && o.dataset.term && !term.value.trim()) term.value = o.dataset.term;
     recalc();
   });
+  if (billingSel && shippingSel) { showAddress(billingSel); showAddress(shippingSel); }
 
   renumber();
   recalc();

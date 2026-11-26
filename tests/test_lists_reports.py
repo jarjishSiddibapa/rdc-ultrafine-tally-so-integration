@@ -33,7 +33,7 @@ def _seed(client, data):
     ids = _make(client, data, 5)
     # one for the other customer so customer filters have something to separate
     r = post(client, "/orders/new", order_form(data, customer_po_number="PO-MH", party_id=str(data["party_mh"].id),
-                                                plant_id=str(data["plant_mh"].id), billing_state_code="27", shipping_state_code="27"))
+                                                plant_id=str(data["plant_mh"].id), billing_address_id=str(data["addr_mh"].id), shipping_address_id=str(data["addr_mh"].id)))
     ids.append(extract_id(r.headers["location"]))
     client.cookies.clear()
     login(client, "accounts@example.com")

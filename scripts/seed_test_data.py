@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from sqlalchemy import select, text  # noqa: E402
 
 from app.core.database import session_factory  # noqa: E402
-from app.models import Item, Party, Plant, Role, SalesOrder, SOType, User  # noqa: E402
+from app.models import Item, Party, PartyAddress, Plant, Role, SalesOrder, SOType, User  # noqa: E402
 from app.services import auth as auth_service  # noqa: E402
 from app.services import orders as so  # noqa: E402
 from app.services.audit import Ctx  # noqa: E402
@@ -55,6 +55,9 @@ def remove(db) -> None:
             c.execute(text("DELETE FROM tally_outbox WHERE order_id = :i"), {"i": oid})
             c.execute(text("DELETE FROM sales_order_items WHERE order_id = :i"), {"i": oid})
             c.execute(text("DELETE FROM sales_orders WHERE id = :i"), {"i": oid})
+        c.execute(text("DELETE FROM party_addresses WHERE party_id IN (SELECT id FROM parties WHERE LEFT(name, 6) = '[DEMO]') "
+                       "AND id NOT IN (SELECT billing_address_id FROM sales_orders WHERE billing_address_id IS NOT NULL) "
+                       "AND id NOT IN (SELECT shipping_address_id FROM sales_orders WHERE shipping_address_id IS NOT NULL)"))
         for table, ref_table, ref_col in (("parties", "sales_orders", "party_id"), ("items", "sales_order_items", "item_id"),
                                           ("sales_ledgers", "sales_orders", "sales_ledger_id")):
             n = c.execute(text(f"DELETE FROM {table} WHERE LEFT(name, 6) = '[DEMO]' AND id NOT IN (SELECT {ref_col} FROM {ref_table} WHERE {ref_col} IS NOT NULL)")).rowcount
@@ -94,7 +97,10 @@ def main() -> int:
     parties = {}
     for name, gstin, st, addr, city, pin, term in PARTIES:
         p = get_or_add(db, Party, name=name)
-        p.gstin, p.state_code, p.address_line1, p.city, p.pincode, p.default_payment_term = gstin, st, addr, city, pin, term
+        p.gstin, p.state_code, p.default_payment_term = gstin, st, term
+        db.flush()
+        if not p.usable_addresses:      # every customer needs a saved address before an order can be raised for it
+            db.add(PartyAddress(party_id=p.id, label="Head office", address_line1=addr, city=city, state_code=st, pincode=pin, is_default=True))
         parties[name] = p
     items = {}
     for name, hsn, rate in ITEMS:
@@ -123,14 +129,12 @@ def main() -> int:
     I = list(items.values())  # noqa: E741
     ledger = so.sales_ledger(db)
 
-    def make(user, n, party, plant, lines, *, days_ago=0, trading=False, state=None, term=None, action="submit", remarks="OK"):
-        st = state or party.state_code
-        addr = f"{party.address_line1}, {party.city} {party.pincode}"
+    def make(user, n, party, plant, lines, *, days_ago=0, trading=False, term=None, action="submit", remarks="OK"):
+        addr = party.default_address
         v = so.Validated(
             so_type=SOType.TRADING_SALES_ORDER if trading else SOType.SALES_ORDER,
             order_date=today - timedelta(days=days_ago), party=party, payment_term=term or party.default_payment_term or "30 days",
-            customer_po_number=f"DEMO-PO-{n:03d}", billing_address=addr, billing_state_code=st,
-            shipping_address=addr, shipping_state_code=st, plant=plant, ledger=ledger,
+            customer_po_number=f"DEMO-PO-{n:03d}", billing=addr, shipping=addr, plant=plant, ledger=ledger,
             narration="", remarks=remarks, lines=[(it, Decimal(str(q)), Decimal(str(r))) for it, q, r in lines],
         )
         v.narration = so.build_narration(party.name, v.lines)

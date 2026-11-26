@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm.exc import StaleDataError
 from starlette.datastructures import FormData
 
+from app.core.constants import GST_STATES
 from app.core.database import get_db
 from app.deps import current_user, get_ctx, require_roles
 from app.models import (
@@ -54,8 +55,14 @@ def _form_context(db: Session, form: svc.OrderForm, errors: dict[str, str], orde
     items = db.execute(select(Item).where(Item.deleted_at.is_(None), Item.is_active.is_(True)).order_by(Item.name)).scalars().all()
     plants = svc.allowed_plants(db, user)  # sales people only see the regions assigned to them
     any_plants = bool(db.execute(select(Plant.id).where(Plant.deleted_at.is_(None), Plant.is_active.is_(True)).limit(1)).first())
+    party_addresses = {
+        p.id: [{"id": a.id, "label": a.label, "text": a.text, "state": a.state_code or "", "state_name": GST_STATES.get(a.state_code or "", ""),
+                "default": a.is_default} for a in p.usable_addresses]
+        for p in parties
+    }
     return {
-        "any_plants": any_plants,
+        "any_plants": any_plants, "party_addresses": party_addresses,
+        "cur_addresses": party_addresses.get(int(form.party_id), []) if form.party_id.isdigit() else [],
         "form": form, "errors": errors, "order": order, "parties": parties, "items": items, "ledger_name": svc.SALES_LEDGER_NAME,
         "plants": plants, "today": today_ist().isoformat(),
         "so_types": list(SOType),
@@ -65,8 +72,8 @@ def _form_context(db: Session, form: svc.OrderForm, errors: dict[str, str], orde
 def _form_from_order(o: SalesOrder) -> svc.OrderForm:
     return svc.OrderForm(
         so_type=o.so_type.value, order_date=o.order_date.isoformat(), party_id=str(o.party_id), payment_term=o.payment_term,
-        customer_po_number=o.customer_po_number, billing_address=o.billing_address, billing_state_code=o.billing_state_code,
-        shipping_address=o.shipping_address, shipping_state_code=o.shipping_state_code or "",
+        customer_po_number=o.customer_po_number, billing_address_id=str(o.billing_address_id or ""),
+        shipping_address_id=str(o.shipping_address_id or ""),
         plant_id=str(o.plant_id or ""), remarks=o.remarks,
         lines=[svc.LineInput(item_id=i.item_id, quantity_raw=format(i.quantity.normalize(), "f"), rate_raw=str(i.rate)) for i in o.items],
     )

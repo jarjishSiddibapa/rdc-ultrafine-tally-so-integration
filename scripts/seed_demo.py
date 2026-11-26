@@ -8,7 +8,7 @@ os.environ["DB_NAME"] = os.environ.get("TEST_DB_NAME", "tally_so_test")
 from sqlalchemy import text  # noqa: E402
 
 from app.core.database import get_engine, session_factory  # noqa: E402
-from app.models import Base, Item, Party, Plant, Role, SalesLedger, User  # noqa: E402
+from app.models import Base, Item, Party, PartyAddress, Plant, Role, SalesLedger, User  # noqa: E402
 from app.services import auth as auth_service  # noqa: E402
 
 assert "test" in os.environ["DB_NAME"], "demo data only goes into a test database"
@@ -24,8 +24,10 @@ for email, role, name in [("admin@demo.test", Role.ADMIN, "Ada Admin"), ("sales@
     auth_service.set_password(db, u, "Demo-Pass-2026", must_change=False)
     db.add(u)
 db.add_all([
-    Party(name="Alpha Traders", gstin="24ABCDE1234F1Z5", state_code="24", address_line1="1 Mill Road", city="Ahmedabad", pincode="380001", default_payment_term="30 days from invoice"),
-    Party(name="Beta Industries", gstin="27ABCDE1234F1Z5", state_code="27", address_line1="9 Port Road", city="Mumbai", pincode="400001"),
+    Party(name="Alpha Traders", gstin="24ABCDE1234F1Z5", state_code="24", default_payment_term="30 days from invoice",
+          addresses=[PartyAddress(label="Head office", address_line1="1 Mill Road", city="Ahmedabad", state_code="24", pincode="380001", is_default=True)]),
+    Party(name="Beta Industries", gstin="27ABCDE1234F1Z5", state_code="27",
+          addresses=[PartyAddress(label="Head office", address_line1="9 Port Road", city="Mumbai", state_code="27", pincode="400001", is_default=True)]),
     Item(name="Ultrafine", hsn_code="2523", gst_rate=18, unit="MT"),
     Item(name="Fly Ash Brick Grade", hsn_code="6901", gst_rate=5, unit="MT"),
     SalesLedger(name="Sales GST"),

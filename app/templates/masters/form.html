@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_macros.html" import csrf, field, state_select with context %}
+{% from "_macros.html" import csrf, field, state_select, icon with context %}
 {% block title %}{{ ('Edit ' if row else 'Add ') ~ k.singular }} · {{ app_name }}{% endblock %}
 {% block content %}
 <div class="page-head"><h1>{{ ('Edit ' if row else 'Add ') ~ k.singular }}</h1></div>
@@ -32,6 +32,18 @@
       {% endif %}
     {% endfor %}
   </div>
+  {% if k.slug == 'parties' and not row %}
+  <fieldset class="plant-pick addr-first">
+    <legend>First address</legend>
+    <p class="hint">Sales orders pick their billing and shipping address from the customer's saved addresses, so add at least one. More can be added after saving.</p>
+    <div class="form-grid">
+      {% for f in address_fields %}
+        {% if f.type == 'state' %}{{ state_select('addr_' ~ f.name, f.label, values.get('addr_' ~ f.name, ''), errors, required=f.required) }}
+        {% else %}{{ field('addr_' ~ f.name, f.label, values.get('addr_' ~ f.name, ''), errors, required=f.required, hint=f.hint or '', maxlength=f.max) }}{% endif %}
+      {% endfor %}
+    </div>
+  </fieldset>
+  {% endif %}
   {% if row %}
   <div class="check"><input id="is_active" type="checkbox" name="is_active" {% if row.is_active %}checked{% endif %}><label for="is_active">Active (available when creating orders)</label></div>
   {% endif %}
@@ -40,4 +52,37 @@
     <a class="btn btn-quiet" href="/masters/{{ k.slug }}">Cancel</a>
   </div>
 </form>
+
+{% if k.slug == 'parties' and row %}
+<section class="panel addr-panel" aria-labelledby="addr-h">
+  <div class="panel-head">
+    <h2 id="addr-h">Addresses</h2>
+    <a class="btn btn-small" href="/masters/parties/{{ row.id }}/addresses/new">{{ icon('plus', 'i-s') }}Add address</a>
+  </div>
+  <p class="hint">Sales people choose the billing and shipping address of an order from this list. They cannot type or change an address on an order. The default is pre-selected.</p>
+  {% if addresses %}
+  <ul class="addr-list">
+    {% for a in addresses %}
+    <li class="addr-item {{ 'is-off' if not a.is_active }}">
+      <div class="addr-main">
+        <div class="addr-title"><strong>{{ a.label }}</strong>
+          {% if a.is_default and a.is_active %}<span class="badge badge-ok">Default</span>{% endif %}
+          {% if not a.is_active %}<span class="badge">Inactive</span>{% endif %}
+          {% if not a.state_code %}<span class="badge badge-warn">State missing</span>{% endif %}
+        </div>
+        <div class="addr-text">{{ a.text }}{% if a.state_code %}, {{ a.state_code|state_name }}{% endif %}</div>
+      </div>
+      <div class="row-actions">
+        <a class="btn btn-small" href="/masters/parties/{{ row.id }}/addresses/{{ a.id }}">Edit</a>
+        {% if a.is_active and not a.is_default %}<form method="post" action="/masters/parties/{{ row.id }}/addresses/{{ a.id }}/default">{{ csrf() }}<button class="btn btn-small" type="submit">Make default</button></form>{% endif %}
+        <form method="post" action="/masters/parties/{{ row.id }}/addresses/{{ a.id }}/delete">{{ csrf() }}<button class="btn btn-small btn-quiet" type="submit" data-confirm="Remove the address {{ a.label }}? Orders already saved keep their own copy of it." data-confirm-label="Remove address">Remove</button></form>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <div class="notice notice-warn" role="status">{{ icon('alert') }}<span>This customer has no address yet, so no order can be raised for them. Add one.</span></div>
+  {% endif %}
+</section>
+{% endif %}
 {% endblock %}

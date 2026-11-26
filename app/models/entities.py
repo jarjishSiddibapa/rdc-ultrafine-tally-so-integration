@@ -100,12 +100,43 @@ class Party(Base, TimestampMixin, SoftDeleteMixin):
     name: Mapped[str] = mapped_column(String(200), nullable=False, index=True)  # must equal the Tally ledger name
     gstin: Mapped[str | None] = mapped_column(String(15))
     default_payment_term: Mapped[str | None] = mapped_column(String(200))
-    address_line1: Mapped[str | None] = mapped_column(String(200))
+    state_code: Mapped[str | None] = mapped_column(String(2))   # GST registration state (matches the GSTIN), e.g. "27"
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    addresses: Mapped[list["PartyAddress"]] = relationship(
+        back_populates="party", lazy="selectin", order_by="(PartyAddress.is_default.desc(), PartyAddress.id)")
+
+    @property
+    def usable_addresses(self) -> list["PartyAddress"]:
+        """Addresses an order may use: not removed, still active, default first."""
+        return [a for a in self.addresses if a.deleted_at is None and a.is_active]
+
+    @property
+    def default_address(self) -> "PartyAddress | None":
+        live = self.usable_addresses
+        return next((a for a in live if a.is_default), live[0] if live else None)
+
+
+class PartyAddress(Base, TimestampMixin, SoftDeleteMixin):
+    """One of a customer's addresses. Sales orders pick their billing and shipping address from these; they cannot be typed on an order."""
+
+    __tablename__ = "party_addresses"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    party_id: Mapped[int] = mapped_column(ForeignKey("parties.id", ondelete="RESTRICT"), nullable=False, index=True)
+    label: Mapped[str] = mapped_column(String(100), nullable=False)          # e.g. "Head office", "Pune warehouse"
+    address_line1: Mapped[str] = mapped_column(String(200), nullable=False)
     address_line2: Mapped[str | None] = mapped_column(String(200))
     city: Mapped[str | None] = mapped_column(String(100))
-    state_code: Mapped[str | None] = mapped_column(String(2))   # GST state code, e.g. "27"
+    state_code: Mapped[str | None] = mapped_column(String(2))                  # GST state code; it decides CGST/SGST or IGST
     pincode: Mapped[str | None] = mapped_column(String(6))
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    party: Mapped["Party"] = relationship(back_populates="addresses")
+
+    @property
+    def text(self) -> str:
+        """The address as one line, exactly what an order stores."""
+        return ", ".join(x for x in (self.address_line1, self.address_line2, self.city, self.pincode) if x)
 
 
 class Item(Base, TimestampMixin, SoftDeleteMixin):
@@ -181,6 +212,10 @@ class SalesOrder(Base, TimestampMixin, SoftDeleteMixin):
     payment_term: Mapped[str] = mapped_column(String(200), nullable=False)
     customer_po_number: Mapped[str] = mapped_column(String(60), nullable=False)
 
+    # The customer addresses the order points at (null on orders from before addresses were managed). The text below is a
+    # copy taken when the order is saved, so later changes to a customer's address never rewrite an old order.
+    billing_address_id: Mapped[int | None] = mapped_column(ForeignKey("party_addresses.id", ondelete="RESTRICT"))
+    shipping_address_id: Mapped[int | None] = mapped_column(ForeignKey("party_addresses.id", ondelete="RESTRICT"))
     billing_address: Mapped[str] = mapped_column(Text, nullable=False)
     billing_state_code: Mapped[str] = mapped_column(String(2), nullable=False)
     shipping_address: Mapped[str] = mapped_column(Text, nullable=False)

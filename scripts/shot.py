@@ -45,11 +45,14 @@ def main() -> None:
     ap.add_argument("--height", type=int, default=900)
     ap.add_argument("--wait", type=float, default=1.6, help="seconds to let entrance animations finish")
     ap.add_argument("--eval", help="JS expression to evaluate after load (prints the result)")
+    ap.add_argument("--eval-file", help="file holding the JS to evaluate after load (easier than quoting it on the command line)")
     ap.add_argument("--viewport-only", action="store_true")
     ap.add_argument("--dark", action="store_true")
     ap.add_argument("--mobile", action="store_true")
     ap.add_argument("paths", nargs="+")
     a = ap.parse_args()
+    if a.eval_file:
+        a.eval = Path(a.eval_file).read_text(encoding="utf-8")
 
     exe = next(p for p in BROWSERS if Path(p).exists())
     out = Path(a.out)
